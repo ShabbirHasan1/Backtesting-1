@@ -2,7 +2,7 @@
 import pandas as pd
 from pathlib import Path
 
-from Strategies import assymetric_system as system
+from Strategies import rsi50-55sma_system as system
 from Trade_Analysis import trade_distribution, trade_summary, rolling_12m_trade_summary
 from Trade_Analysis import walkforward_annual_summary
 from PNL_Generation import pnl_generation as pg
@@ -20,15 +20,15 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/Assymetric_Monthly"+"/NZ1 Index_5-20"
+    underlying_name = "Results/rsi50-55sma"+"/NZ1 Index"
 
-    period_1=5
-    period_2=20
+    period_1=55
+    period_2=14
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = system.assymetric_system(price_data, period_1,period_2,period="M")
+    trades, price_signal = system.sma_crossover_system(price_data, period_1,period="")
 
     #trades, price_signal = wma20_macd_system.wma20_macd_system(price_data, period_1, period="M")
 
