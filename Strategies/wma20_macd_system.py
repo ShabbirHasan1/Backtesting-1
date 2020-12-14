@@ -1,7 +1,7 @@
 from Technical_Indicators import wma as wma_1
 from Technical_Indicators import macd as macd_1
 from Timeframe_Manipulation import series_resampling as series_resampling
-from Trade_Generation import trade_close as tc
+from Trade_Generation import trade_generation as tc
 from Trade_Generation import creating_individual_trade
 import numpy as np
 
@@ -33,6 +33,6 @@ def wma20_macd_system(price_data, wma_period1,period="", trade_type="Both_leg", 
     if trade_type == "Individual":
         trades = creating_individual_trade.creating_individual_trade(price_signal, underlying_instrument_data)
     else:
-        trades = tc.trade_close(price_signal)
+        trades = tc.trade_generation(price_signal)
 
     return trades, price_signal

@@ -1,6 +1,6 @@
 from Technical_Indicators import oscillator as oscillator
 from Timeframe_Manipulation import series_resampling as series_resampling
-from Trade_Generation import trade_close as tc
+from Trade_Generation import trade_generation as tc
 from Trade_Generation import creating_individual_trade
 
 previous_signal = 0
@@ -32,7 +32,7 @@ def oscillator_system(price_data, period="", trade_type="Both_leg", underlying_i
         trades = creating_individual_trade.creating_individual_trade(price_signal, price_signal["Open"],
                                                                      underlying_instrument_data)
     else:
-        trades = tc.trade_close(price_signal, "Open")
+        trades = tc.trade_generation(price_signal, "Open")
 
     return trades, price_signal
 

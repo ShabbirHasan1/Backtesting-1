@@ -1,7 +1,7 @@
 from Trades import Trades
 
 
-def trade_close(price_signal,trade_signal="Close"):
+def trade_generation(price_signal,trade_signal="Close"):
     trade_position = 0
     trade_open = False
     trade_number = 0
