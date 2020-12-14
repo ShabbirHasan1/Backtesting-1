@@ -2,7 +2,7 @@
 import pandas as pd
 from pathlib import Path
 
-from Strategies import rsi2_50sma as system
+from Strategies import rsi2_system as system
 from Trade_Analysis import trade_distribution, trade_summary, rolling_12m_trade_summary
 from Trade_Analysis import walkforward_annual_summary
 from PNL_Generation import pnl_generation as pg
@@ -20,15 +20,15 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/rsi2-50sma_weekly"+"/NZ1 Index"
+    underlying_name = "Results/rsi2_Monthly"+"/NZ1 Index"
 
-    period_1=50
-    period_2=2
+    period_1=2
+    #period_2=2
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = system.rsi2_50sma_system(price_data, period_1,period_2,period="W")
+    trades, price_signal = system.rsi2_system(price_data, period_1,period="M")
 
     #trades, price_signal = wma20_macd_system.wma20_macd_system(price_data, period_1, period="M")
 

@@ -5,8 +5,6 @@ from Trade_Generation import creating_individual_trade
 
 import numpy as np
 
-previous_signal = 0
-
 
 def rsi2_50sma_system(price_data, period_sma, period_rsi, period="", trade_type="Both_leg",
                       underlying_instrument_data=None):
@@ -52,20 +50,3 @@ def rsi2_50sma_system(price_data, period_sma, period_rsi, period="", trade_type=
         trades = tc.trade_close(price_signal)
 
     return trades, price_signal
-
-
-def rsi_signal_generation(rsi, rsi_1):
-    global previous_signal
-
-    rsi_1.fillna(0, inplace=True)
-
-    if rsi_1 > 90 & rsi < 90:
-        signal = -1
-    elif rsi_1 < 10 & rsi > 10:
-        signal = 1
-    else:
-        signal = previous_signal
-
-    previous_signal = signal
-
-    return signal
