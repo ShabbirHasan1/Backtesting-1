@@ -5,14 +5,16 @@ from Trade_Generation import creating_individual_trade
 
 import numpy as np
 
-def sma_crossover_system(price_data, period_sma, period_rsi, period="",trade_type="Both_leg", underlying_instrument_data=None):
-    period_sma = str(period_sma) + "_SMA"
-    period_rsi=str(period_rsi) + "_RSI"
 
-    if period=="":
-        price_period=price_data
+def rsi50_55sma_system(price_data, period_sma, period_rsi, period="", trade_type="Both_leg",
+                       underlying_instrument_data=None):
+
+    period_sma_str=str(period_sma)+"_SMA"
+
+    if period == "":
+        price_period = price_data
     else:
-        price_period=series_resampling.price_series_periodic(price_data,period)
+        price_period = series_resampling.price_series_periodic(price_data, period)
 
     sma.sma(price_period, period_sma)
     rsi.rsi(price_period, period_rsi)
@@ -21,10 +23,12 @@ def sma_crossover_system(price_data, period_sma, period_rsi, period="",trade_typ
 
     price_signal = price_data
 
-    #price_signal_period[period_sma] = sma_1
+    # price_signal_period[period_sma] = sma_1
 
-    price_signal_period["Signal"] = np.where((price_signal_period["Close"]>price_signal_period[period_sma]) & (price_signal_period["rsi"]>50)
-                                             , 1, np.where((price_signal_period["Close"]<price_signal_period[period_sma]) & (price_signal_period["rsi"]<50),-1,0))
+    price_signal_period["Signal"] = np.where((price_signal_period[period_sma_str] <= price_signal_period["Close"]) &
+                                      (price_signal_period["rsi"] > 50), 1,
+                                      np.where((price_signal_period[period_sma_str] > price_signal_period["Close"]) &
+                                               (price_signal_period["rsi"] < 50), -1, 0))
 
     price_signal["Signal"] = price_signal_period["Signal"].resample("D").ffill()
     price_signal["Signal"].fillna(0, inplace=True)
