@@ -1,7 +1,12 @@
 import pandas as pd
+import numpy as np
 
 
-def creating_individual_trade(price_signal, underlying_instrument_data):
+def creating_individual_trade(price_signal,trade_price_data=None, underlying_instrument_data=None):
+
+    if underlying_instrument_data==None:
+        underlying_instrument_data=price_signal
+
     trades = pd.DataFrame(
         columns=["Date", "Price", "Side", "Contract", "Contract_Type", "Qty", "Trading_Cost", "Strike_Price"])
 
@@ -11,7 +16,10 @@ def creating_individual_trade(price_signal, underlying_instrument_data):
 
     trades["Date"] = trade_data.index
     trades.set_index("Date", inplace=True)
-    trades["Price"] = underlying_instrument_data["Close"].loc[trade_data.index]
+    if trade_price_data==None:
+        trades["Price"] = trade_price_data.loc[trade_data.index]
+    else:
+        trades["Price"] = underlying_instrument_data["Close"].loc[trade_data.index]
     trades["Side"] = trade_data["Signal"]
     trades["Qty"] = trade_data["Trades"].abs()
     trades["Date"] = trades.index

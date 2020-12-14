@@ -1,7 +1,7 @@
 from Trades import Trades
 
 
-def trade_close(price_signal,trade_signal="Close"):
+def trade_open(price_signal):
     trade_position = 0
     trade_open = False
     trade_number = 0
@@ -16,11 +16,11 @@ def trade_close(price_signal,trade_signal="Close"):
                 trade_number += 1
                 entry_date = i
                 trade_open = True
-                entry_price = price_signal.loc[i][trade_signal]
+                entry_price = price_signal.loc[i]["Open"]
 
             elif 0 == price_signal.loc[i]["Signal"]:
                 exit_date = i
-                exit_price = price_signal.loc[i][trade_signal]
+                exit_price = price_signal.loc[i]["Open"]
                 trade_a = Trades(entry_date, entry_price, exit_date, exit_price, trade_position, price_signal.loc[
                     (entry_date <= price_signal.index) & (price_signal.index <= exit_date)])
                 trade.append(trade_a)
@@ -30,7 +30,7 @@ def trade_close(price_signal,trade_signal="Close"):
 
             else:
                 exit_date = i
-                exit_price = price_signal.loc[i][trade_signal]
+                exit_price = price_signal.loc[i]["Open"]
                 trade_a = Trades(entry_date, entry_price, exit_date, exit_price, trade_position, price_signal.loc[
                     (entry_date <= price_signal.index) & (price_signal.index <= exit_date)])
                 trade.append(trade_a)
@@ -38,7 +38,7 @@ def trade_close(price_signal,trade_signal="Close"):
                 trade_position = price_signal.loc[i]["Signal"]
                 trade_number = trade_number + 1
                 entry_date = i
-                entry_price = price_signal.loc[i][trade_signal]
+                entry_price = price_signal.loc[i]["Open"]
                 trade_open = True
 
     if trade_position != 0:
