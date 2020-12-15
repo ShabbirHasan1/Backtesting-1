@@ -16,7 +16,7 @@ def creating_individual_trade(price_signal,trade_price_data=None, underlying_ins
 
     trades["Date"] = trade_data.index
     trades.set_index("Date", inplace=True)
-    if trade_price_data==None:
+    if trade_price_data!=None:
         trades["Price"] = trade_price_data.loc[trade_data.index]
     else:
         trades["Price"] = underlying_instrument_data["Close"].loc[trade_data.index]
