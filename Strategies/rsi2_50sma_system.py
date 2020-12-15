@@ -5,9 +5,14 @@ from Trade_Generation import creating_individual_trade
 
 import numpy as np
 
+entry_level=0
+previous_signal=0
 
-def rsi2_50sma_system(price_data, period_sma, period_rsi, period="", trade_type="Both_leg",
+def rsi2_50sma_system(price_data, period_sma, period_rsi, stop_level=100, period="", trade_type="Both_leg",
                       underlying_instrument_data=None):
+
+    stop_level=stop_level/100
+
     period_sma_str = str(period_sma) + "_SMA"
 
     if period == "":
@@ -35,12 +40,15 @@ def rsi2_50sma_system(price_data, period_sma, period_rsi, period="", trade_type=
 
     price_signal_period["Signal_rsi"].replace(to_replace=0,method="ffill",inplace=True)
 
-    price_signal_period["Signal"] = np.where(
+    price_signal_period["Signal_1"] = np.where(
         ((price_signal_period["Signal_sma"] == price_signal_period["Signal_rsi"]) & (price_signal_period["Signal_rsi"]== 1)), 1,
         np.where(((price_signal_period["Signal_sma"] == price_signal_period["Signal_rsi"]) & (price_signal_period["Signal_rsi"]== -1)), -1, 0))
 
-    price_signal["Signal"] = price_signal_period["Signal"].resample("D").ffill()
-    price_signal["Signal"].fillna(0, inplace=True)
+    price_signal["Signal_1"] = price_signal_period["Signal_1"].resample("D").ffill()
+    price_signal["Signal_1"].fillna(0, inplace=True)
+
+    price_signal["Signal"] = price_signal[["Close","Signal_1"]].apply(
+        lambda x: stop_loss(*x,stop_level), axis=1)
 
     price_signal["Trades"] = price_signal["Signal"] - price_signal["Signal"].shift(1)
 
@@ -50,3 +58,32 @@ def rsi2_50sma_system(price_data, period_sma, period_rsi, period="", trade_type=
         trades = tc.trade_generation(price_signal)
 
     return trades, price_signal
+
+def stop_loss(close,signal_1,stop_level):
+
+    global entry_level
+    global previous_signal
+
+    if signal_1 != previous_signal:
+        entry_level = close
+        signal=signal_1
+        previous_signal = signal_1
+
+    elif previous_signal == 1:
+        if close/entry_level < (1-stop_level):
+            signal=0
+        else:
+            signal=signal_1
+
+    elif previous_signal == -1:
+        if close/entry_level > (1+stop_level ):
+            signal=0
+        else:
+            signal=signal_1
+
+    else:
+        signal=signal_1
+
+    previous_signal=signal_1
+
+    return signal

@@ -68,7 +68,7 @@ def excel_creation(data_frames, dir_name,excel_name):
 
     output_file=output_dir/output_file_name
 
-    with pd.ExcelWriter(output_file) as writer:
+    with pd.ExcelWriter(output_file,datetime_format="%d-%m-%Y") as writer:
         for n, df in enumerate(data_frames):
             df.to_excel(writer, sheet_name=data_frames[n].name)
         writer.save()
