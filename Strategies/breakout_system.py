@@ -7,7 +7,7 @@ import pandas as pd
 previous_signal = 0
 
 
-def breakout_system(price_data, atr_period=44, daily_range_period=4, period="", trade_type="Both_leg",
+def breakout_system(price_data, period="", trade_type="Both_leg",
                     underlying_instrument_data=None):
     if period == "":
         price_period = price_data
@@ -18,14 +18,15 @@ def breakout_system(price_data, atr_period=44, daily_range_period=4, period="", 
     price_signal = price_data
 
     price_signal_period["Buy Level"] = price_signal_period["Open"] + (
-                price_signal_period["CLose"].shift(1) - price_signal_period["Low"].shift(1))
+                price_signal_period["Close"].shift(1) - price_signal_period["Low"].shift(1))
     price_signal_period["Sell Level"] = price_signal_period["Open"] - (
                 price_signal_period["High"].shift(1) - price_signal_period["Close"].shift(1))
 
     price_signal_period["Position window today"] = np.where(
-        price_signal_period["Open"] >= price_signal_period["Close"].shift(1), 1, -1)
+        price_signal_period["Open"] > price_signal_period["Close"].shift(1), 1, np.where(
+        price_signal_period["Open"] < price_signal_period["Close"].shift(1),-1,0))
 
-    price_signal_period["Position window yesterday"] = price_signal_period["Position window"].shift(1)
+    price_signal_period["Position window yesterday"] = price_signal_period["Position window today"].shift(1)
 
     Signal = price_signal_period.apply(lambda x: signal_generation(*x), axis=1)
 
@@ -62,7 +63,7 @@ def signal_generation(Open, High, Low, Close, Volume, Buy_level, Sell_level, Pos
             else:
                 signal = 0
                 trade_level = 0
-        else:
+        elif Position_window_yesterday==-1:
             if Low < Sell_level:
                 signal = -1
                 trade_level = Sell_level
@@ -70,6 +71,9 @@ def signal_generation(Open, High, Low, Close, Volume, Buy_level, Sell_level, Pos
             else:
                 signal = 0
                 trade_level = 0
+        else:
+            signal = 0
+            trade_level = 0
 
     elif previous_signal == 1:
         if Position_window_today==-1:
