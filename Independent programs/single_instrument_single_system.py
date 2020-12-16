@@ -20,7 +20,7 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/Series3_Daily"+"/NZ1 Index"
+    underlying_name = "Results/Breakout_Daily"+"/NZ1 Index"
 
     period_1=50
     period_2=2
