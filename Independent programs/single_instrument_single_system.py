@@ -2,7 +2,7 @@
 import pandas as pd
 from pathlib import Path
 
-from Strategies import breakout_system as system
+from Strategies import bband_system as system
 from Trade_Analysis import trade_distribution, trade_summary, rolling_12m_trade_summary
 from Trade_Analysis import walkforward_annual_summary
 from PNL_Generation import pnl_generation as pg
@@ -20,16 +20,14 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/Breakout_Daily"+"/NZ1 Index"
+    underlying_name = "Results/bband_Daily"+"/NZ1 Index"
 
-    period_1=50
-    period_2=2
-    stop_level=3
+    period_1=20
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = system.breakout_system(price_data,period="")
+    trades, price_signal = system.bband_system(price_data,period_1,period="")
 
     trade_summary_data = trade_summary.trade_summary(trades)
 
