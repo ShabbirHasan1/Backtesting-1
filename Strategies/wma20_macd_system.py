@@ -5,7 +5,7 @@ from Trade_Generation import trade_generation as tc
 from Trade_Generation import creating_individual_trade
 import numpy as np
 
-def wma20_macd_system(price_data, wma_period1,period="", trade_type="Both_leg", underlying_instrument_data=None):
+def wma20_macd_system(price_data, wma_period1=20,period="", trade_type="Both_leg", underlying_instrument_data=None):
     wma_period1 = wma_period1
     period_wma = str(wma_period1) + "_wma"
 

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from Strategies import wma20_macd_system as wma_macd
+from Strategies import wma20_macd_system as system
 from Trade_Analysis import trade_distribution, trade_summary, rolling_12m_trade_summary
 from Trade_Analysis import walkforward_annual_summary
 from Timeframe_Manipulation import series_resampling as tm
@@ -11,9 +11,10 @@ import warnings
 
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
+    system_name="20wma_macd_Daily"
+    underlying="Stocks"
 
-
-    folder_path = Path().absolute().joinpath("Data/Futures prices CSV")
+    folder_path = Path().absolute().joinpath("Data/Stock prices CSV")
     nifty_path=Path().absolute().joinpath("Data/price_Data/Nifty Index.csv")
 
     nifty_data=my_funcs.reading_price_data_from_csv(nifty_path)
@@ -55,7 +56,7 @@ if __name__ == '__main__':
 
         print(f"Trades for {symbol}")
 
-        trades = wma_macd.wma20_macd_system(price_data[symbol], period_1)
+        trades, _ = system.wma20_macd_system(price_data[symbol], period_1, period="")
 
         trade_summary_data_full = trade_summary.trade_summary(trades)
 
@@ -105,4 +106,7 @@ if __name__ == '__main__':
 
     to_be_saved_as_csv = [trade_summary_data, pnl_series, pnl_series_monthly, pnl_series_annual]
 
-    my_funcs.csv_creation(to_be_saved_as_csv, "Results/20WMA-MACD/Futures")
+    output_folder=system_name+"/"+underlying
+
+    #my_funcs.csv_creation(to_be_saved_as_csv, "Results/"+output_folder)
+    my_funcs.excel_creation(to_be_saved_as_csv, "Results/"+output_folder, underlying )
