@@ -4,7 +4,7 @@ import numpy as np
 
 def creating_individual_trade(price_signal,trade_price_data=None, underlying_instrument_data=None):
 
-    if underlying_instrument_data==None:
+    if underlying_instrument_data is None:
         underlying_instrument_data=price_signal
 
     trades = pd.DataFrame(
@@ -16,26 +16,30 @@ def creating_individual_trade(price_signal,trade_price_data=None, underlying_ins
 
     trades["Date"] = trade_data.index
     trades.set_index("Date", inplace=True)
-    if trade_price_data!=None:
-        trades["Price"] = trade_price_data.loc[trade_data.index]
-    else:
+    if trade_price_data is None:
         trades["Price"] = underlying_instrument_data["Close"].loc[trade_data.index]
+
+    else:
+        trades["Price"] = trade_price_data.loc[trade_data.index]
+
+
     trades["Side"] = trade_data["Signal"]
     trades["Qty"] = trade_data["Trades"].abs()
     trades["Date"] = trades.index
     trades.index = range(len(trades["Date"]))
 
     # Inserting first day trade
-    last_day = price_signal[price_signal.index < underlying_instrument_data.index[0]].index[-1]
+    if price_signal.index[0] != underlying_instrument_data.index[0]:
+        last_day = price_signal[price_signal.index < underlying_instrument_data.index[0]].index[-1]
 
-    if price_signal["Signal"].loc[last_day] != 0:
-        a = {"Date": underlying_instrument_data.index[0],
-             "Price": underlying_instrument_data["Open"].iloc[0],
-             "Side": price_signal["Signal"].loc[last_day],
-             "Qty": 1
-             }
-        trades_1 = pd.DataFrame(a, index=[0])
-        trades = pd.concat([trades, trades_1], axis=0, ignore_index=True)
+        if price_signal["Signal"].loc[last_day] != 0:
+            a = {"Date": underlying_instrument_data.index[0],
+                "Price": underlying_instrument_data["Open"].iloc[0],
+                "Side": price_signal["Signal"].loc[last_day],
+                "Qty": 1
+                }
+            trades_1 = pd.DataFrame(a, index=[0])
+            trades = pd.concat([trades, trades_1], axis=0, ignore_index=True)
 
     # Inserting last day trade
 
