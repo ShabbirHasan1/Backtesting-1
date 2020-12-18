@@ -29,8 +29,8 @@ def reading_price_data_from_csv(file_path):
     return price_data
 
 
-def reading_trades_from_csv():
-    trades = pd.read_csv("D:\\PycharmProjects\\Backtesting\\Data\\Sample trades.csv", header=0, parse_dates=True)
+def reading_trades_from_csv(file_path):
+    trades = pd.read_csv(file_path, header=0, parse_dates=True)
     trades["Date"] = pd.to_datetime(trades["Date"], format="%d-%m-%Y")
 
     return trades
@@ -43,7 +43,7 @@ def import_price_data_from_csv_files(folder_path, symbols):
         price_data_name = pd.read_csv(folder_path.joinpath( symbol + '.csv'))
         price_data_name.set_index("Dates", inplace=True)
         price_data_name.columns = ["Open", "High", "Low", "Close", "Volume"]
-        price_data_name.index = pd.to_datetime(price_data_name.index, format="%Y-%m-%d")
+        price_data_name.index = pd.to_datetime(price_data_name.index, format="%d-%m-%Y")
 
         price_data[symbol] = price_data_name
 

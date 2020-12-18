@@ -10,18 +10,21 @@ if __name__ == '__main__':
     warnings.filterwarnings("ignore")
 
     baseamount = 10000000
+    current_folder_path =  Path().absolute().joinpath("Data")
+    trade_file_path=current_folder_path / "Sample Trades.csv"
 
-    folder_path = "D:\\PycharmProjects\\Backtesting\\Data\\Price_Data"
+
+    price_data_path = current_folder_path/"Price_Data"
 
     underlying_name = "example_PNL_from_trade"
 
     symbols = ["NZ1 Index", "Nifty Index"]
 
-    price_data = my_funcs.import_price_data_from_csv_files(folder_path, symbols)
+    price_data = my_funcs.import_price_data_from_csv_files(price_data_path, symbols)
 
     universal_dates = price_data[symbols[1]].index
 
-    individual_trade_list = my_funcs.reading_trades_from_csv()
+    individual_trade_list = my_funcs.reading_trades_from_csv(trade_file_path)
 
     individual_trade_list.columns=["Date","Price","Side","Contract","Contract_Type","Qty","Trading_Cost","Strike_Price"]
 
