@@ -100,7 +100,6 @@ def pnl_timeseries_multiple_strategy_trade(trades, price_data, dates, baseamount
 
     price_data_close_series.fillna(method="ffill", inplace=True)
     price_data_close_series.fillna(0, inplace=True)
-
     for i in trades:
         position_data[i.contract].loc[i.date] += i.quantity * i.side
         pnl_data_trade[i.contract].loc[i.date] += ((price_data_close_series[i.contract].loc[i.date] - i.adjusted_price) * i.side * i.quantity)
@@ -112,6 +111,7 @@ def pnl_timeseries_multiple_strategy_trade(trades, price_data, dates, baseamount
 
 
     for contract in contract_list:
+
         pnl_data_position[contract] = position_data[contract].shift(1) * (
                     price_data_close_series[contract] - price_data_close_series[contract].shift(1))
 

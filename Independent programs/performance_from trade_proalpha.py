@@ -1,4 +1,6 @@
 import pandas as pd
+import openpyxl as xl
+import numpy as np
 from pathlib import Path
 import collections
 from Trade_Generation import creating_individual_trade, creating_individual_trade_db
@@ -7,8 +9,14 @@ from PNL_Generation import pnl_generation as pg
 import my_funcs
 import warnings
 '''
-need to update the symbolas and segregate the price series to be sent for pnl calculation
+need to update the symbols and segregate the price series to be sent for pnl calculation
 '''
+
+def set_dataframe(df):
+    df.columns=df.loc[0]
+    df.drop(0,inplace=True)
+    df.set_index("Dates",inplace=True)
+
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
 
@@ -16,13 +24,44 @@ if __name__ == '__main__':
 
     current_folder_path = Path().absolute().joinpath("Data")
     nifty_price_data = current_folder_path / "Price_Data/Nifty Index.csv"
-    trade_file_path = current_folder_path / "trade_data_sample.csv"
+    trade_file_path = current_folder_path / "proalpha_data/trade_data_sample.csv"
+
+    price_data_file= current_folder_path / "proalpha_data/OHLC.xlsx"
+
+    wb = xl.load_workbook(price_data_file)
+
+    sheet_name=wb.get_sheet_names()
+
+    data={}
+
+    for i in sheet_name:
+        data[i]=pd.DataFrame(wb.get_sheet_by_name(i).values)
+        set_dataframe(data[i])
+
+    symbols = data["CLOSE"].columns
+
+    price_data={}
+
+    for i in symbols:
+
+        a = pd.DataFrame()
+        a["Open"]=data["OPEN"][i]
+        a["High"] = data["HIGH"][i]
+        a["Low"] = data["LOW"][i]
+        a["Close"] = data["CLOSE"][i]
+        a["Volume"]=0
+        a.replace("#N/A N/A",np.nan,inplace=True)
+        a.dropna(subset=["Close"],inplace=True)
+        a.fillna(method="bfill",axis=1)
+
+        price_data[i]=a
+
+#    Nifty_Data = pd.read_csv(nifty_price_data, header=0)
+#    Nifty_Data.set_index("Dates", inplace=True)
+
+    universal_dates = price_data["Nifty INDEX"].index
 
 
-    Nifty_Data = pd.read_csv(nifty_price_data, header=0)
-    Nifty_Data.set_index("Dates", inplace=True)
-
-    universal_dates = Nifty_Data.index
 
     individual_trade_list = my_funcs.reading_trades_from_csv(trade_file_path)
 
@@ -34,12 +73,20 @@ if __name__ == '__main__':
     symbols = individual_trade_list["Contract"].unique()
 
 
-    price_data = my_funcs.import_price_data_from_csv_files(current_folder_path / "Price_Data", symbols)
+    #price_data = my_funcs.import_price_data_from_csv_files(current_folder_path / "Price_Data", symbols)
 
-    pnl_series = collections.defaultdict(dict)
+    pnl_series={}
+
+    pnl_series_strategy=pd.DataFrame(0,columns=strategy_list,index=universal_dates)
+    gross_exposure_strategy=pd.DataFrame(0,columns=strategy_list,index=universal_dates)
+    net_exposure_strategy=pd.DataFrame(0,columns=strategy_list,index=universal_dates)
 
     for account in account_list:
         for strategy in strategy_list:
+
+            if strategy==strategy_list[-1]:
+                print(strategy)
+
             trade_list_to_pass = individual_trade_list[
                 (individual_trade_list["Account"] == account) & (individual_trade_list["Strategy"] == strategy)]
             trade_list_to_pass.drop(["Account","Strategy"],axis=1,inplace=True)
@@ -47,28 +94,21 @@ if __name__ == '__main__':
 
             trade_register = creating_individual_trade_db.creating_individual_trade_db(trade_list_to_pass)
 
-            pnl_series[account][strategy], _ = pg.pnl_timeseries_multiple_strategy_trade(trade_register, price_data,
+            pnl_series_1, _ = pg.pnl_timeseries_multiple_strategy_trade(trade_register, price_data,
                                                                       universal_dates, baseamount)
 
-    trade_data = pd.DataFrame.from_records([x.get_individual_trade_data() for x in trade_register], index="Trade ID")
 
-    pnl_series_monthly = pd.DataFrame(columns=["PNL", "DD"])
-    pnl_series_annual = pd.DataFrame(columns=["PNL", "DD"])
+            pnl_series_strategy[strategy]=pnl_series_1["Daily PNL"]
+            gross_exposure_strategy[strategy] = pnl_series_1["Gross Exposure"]
+            net_exposure_strategy[strategy] = pnl_series_1["EOD Net Exposure"]
 
-    pnl_series_monthly["PNL"] = pnl_series["Cumulative PNL%"].resample("M").sum()
-    pnl_series_monthly["DD"], *_ = pg.DD_sum(pnl_series_monthly["PNL"].cumsum(), 1)
+        pnl_series[account] = [pnl_series_strategy,gross_exposure_strategy,net_exposure_strategy]
 
-    pnl_series_monthly["_rolling_12m"] = pnl_series_monthly["PNL"].rolling(12).sum()
-    pnl_series_monthly["_rolling_12m"].fillna(0, inplace=True)
+    for account in account_list:
+        pnl_series[account][0].name = "PNL Series "+ account
+        pnl_series[account][1].name = "Gross exposure Series " + account
+        pnl_series[account][2].name = "Net exposure Series " + account
+        to_be_saved_as_csv = [ pnl_series[account][0] ,pnl_series[account][1],pnl_series[account][2]]
 
-    pnl_series_annual["PNL"] = pnl_series["Cumulative PNL%"].resample("Y").sum()
-    pnl_series_annual["DD"], *_ = pg.DD_sum(pnl_series_annual["PNL"].cumsum(), 1)
+        my_funcs.excel_creation(to_be_saved_as_csv, "Pro_Alpha_PNL", account+".xlsx")
 
-    pnl_series_monthly.name = "Monthly PNL"
-    pnl_series.name = "PNL Series New"
-    trade_data.name = "Sample Trade Data"
-
-    to_be_saved_as_csv = [pnl_series_monthly, pnl_series, trade_data]
-
-    my_funcs.excel_creation(to_be_saved_as_csv, "Pro_Alpha_PNL", "trial.xlsx")
-    my_funcs.csv_creation(to_be_saved_as_csv, "Pro_Alpha_PNL")
