@@ -29,7 +29,6 @@ class Individual_Trades:
 
         if self.individual_trade_check():
             self.__class__.trade_register.append(self)
-            #Individual_Trades.trade_register.append(self)
         else:
             del self
 
@@ -37,6 +36,9 @@ class Individual_Trades:
 
     def __eq__(self, other):
         return self.trade_id == other.trade_id
+
+    def re_initialise(self):
+        Individual_Trades.trade_register=[]
 
     def get_individual_trade_data(self):
         return {"Trade ID": self.trade_id,

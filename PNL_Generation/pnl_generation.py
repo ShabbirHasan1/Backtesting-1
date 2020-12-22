@@ -85,16 +85,15 @@ def pnl_timeseries_monthly_rebalance(trades, price_data, baseamount):
 
 
 def pnl_timeseries_multiple_strategy_trade(trades, price_data, dates, baseamount):
-
     contract_list = list(price_data.keys())
 
     position_data = pd.DataFrame(0, index=dates, columns=contract_list)
     pnl_data_trade = pd.DataFrame(0, index=dates, columns=contract_list)
     pnl_data_position = pd.DataFrame(0, index=dates, columns=contract_list)
-    gross_exposure_data=pd.DataFrame(0, index=dates, columns=contract_list)
-    net_exposure_data=pd.DataFrame(0, index=dates, columns=contract_list)
+    pnl_series = pd.DataFrame(0,index=dates,columns=["Daily PNL"])
 
-    price_data_close_series=pd.DataFrame(0,index=dates,columns=contract_list)
+
+    price_data_close_series = pd.DataFrame(0, index=dates, columns=contract_list)
     for contract in contract_list:
         price_data_close_series[contract] = price_data[contract]["Close"]
 
@@ -102,29 +101,26 @@ def pnl_timeseries_multiple_strategy_trade(trades, price_data, dates, baseamount
     price_data_close_series.fillna(0, inplace=True)
     for i in trades:
         position_data[i.contract].loc[i.date] += i.quantity * i.side
-        pnl_data_trade[i.contract].loc[i.date] += ((price_data_close_series[i.contract].loc[i.date] - i.adjusted_price) * i.side * i.quantity)
+        pnl_data_trade[i.contract].loc[i.date] += (
+                    (price_data_close_series[i.contract].loc[i.date] - i.adjusted_price) * i.side * i.quantity)
     position_data = position_data.cumsum()
     position_data.fillna(0)
 
-    gross_exposure_data = position_data.abs()*price_data_close_series
-    net_exposure_data = position_data*price_data_close_series
-
+    gross_exposure_data = position_data.abs() * price_data_close_series
+    net_exposure_data = position_data * price_data_close_series
 
     for contract in contract_list:
-
         pnl_data_position[contract] = position_data[contract].shift(1) * (
-                    price_data_close_series[contract] - price_data_close_series[contract].shift(1))
+                price_data_close_series[contract] - price_data_close_series[contract].shift(1))
 
-    pnl_series = pd.DataFrame(index=dates)
-
-    pnl_series["Daily PNL"] = pnl_data_position.sum(axis=1)+pnl_data_trade.sum(axis=1)
+    pnl_series["Daily PNL"] = pnl_data_position.sum(axis=1) + pnl_data_trade.sum(axis=1)
     pnl_series["Gross Exposure"] = gross_exposure_data.sum(axis=1)
     pnl_series["EOD Net Exposure"] = net_exposure_data.sum(axis=1)
     pnl_series["Cumulative PNL"] = pnl_series["Daily PNL"].cumsum()
     pnl_series["Cumulative PNL%"] = pnl_series["Cumulative PNL"] / baseamount
     pnl_series["DD in %"], DD_distribution = DD_sum(pnl_series["Cumulative PNL"], baseamount)
     pnl_series["DD in INR"] = (pnl_series["Cumulative PNL"] - (pnl_series["Cumulative PNL"].shift(1).cummax()))
-    #pnl_series["DD in INR"]=pnl_series["DD in INR"].apply(lambda x: [y if y<0 else 0 for y in x])
+    # pnl_series["DD in INR"]=pnl_series["DD in INR"].apply(lambda x: [y if y<0 else 0 for y in x])
     pnl_series["DD in INR"][pnl_series["DD in INR"] > 0] = 0
     pnl_series["DD in INR"].fillna(0, inplace=True)
 

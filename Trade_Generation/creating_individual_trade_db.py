@@ -1,6 +1,7 @@
 from Individual_Trades import Individual_Trades
 
 def creating_individual_trade_db(trades):
+
     for i in trades.index:
 
         a = Individual_Trades(trades.iloc[i].Date,

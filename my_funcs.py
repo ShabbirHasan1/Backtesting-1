@@ -1,5 +1,4 @@
 from pathlib import Path
-import glob
 import pandas as pd
 import os
 
@@ -61,14 +60,13 @@ def import_all_price_data_from_csv_files(folder_path):
     return price_data
 
 def excel_creation(data_frames, dir_name,excel_name):
+
     output_dir=Path().absolute().joinpath(dir_name)
     output_dir.mkdir(parents=True, exist_ok=True)
-
     output_file_name=excel_name+".xlsx"
-
     output_file=output_dir/output_file_name
 
-    with pd.ExcelWriter(output_file,datetime_format="%d-%m-%Y") as writer:
+    with pd.ExcelWriter(output_file, engine="openpyxl",datetime_format='DD/MM/YYYY',float_format="#,##0;-#,[RED]#,##0") as writer:
         for n, df in enumerate(data_frames):
             df.to_excel(writer, sheet_name=data_frames[n].name)
         writer.save()
