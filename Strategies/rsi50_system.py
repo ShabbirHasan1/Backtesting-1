@@ -4,9 +4,9 @@ from Trade_Generation import trade_generation as tc
 from Trade_Generation import creating_individual_trade
 import numpy as np
 
-def rsi50_system(price_data, period_1,period="",trade_type="Both_leg", underlying_instrument_data=None):
+def rsi50_system(price_data, period_1=14,period="",trade_type="Both_leg", underlying_instrument_data=None):
 
-    if period=="":
+    if (period=="") or (period is None):
         price_period=price_data
     else:
         price_period=series_resampling.price_series_periodic(price_data,period)

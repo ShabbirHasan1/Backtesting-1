@@ -1,6 +1,8 @@
 from pathlib import Path
 import pandas as pd
 import os
+import openpyxl
+from collections import namedtuple
 
 
 def convert_datetime(data_frame):
@@ -70,3 +72,49 @@ def excel_creation(data_frames, dir_name,excel_name):
         for n, df in enumerate(data_frames):
             df.to_excel(writer, sheet_name=data_frames[n].name)
         writer.save()
+
+def reading_list_of_strats_from_excel(input_file_path):
+
+    input_file_name = "Strategies.xlsx"
+    input_file = input_file_path / input_file_name
+
+    strategies=read_from_excel(input_file)
+
+    strategies_data=strategies["Strategies"]
+
+
+    strategy_list=iternamedtuples(strategies_data)
+
+    return strategy_list
+
+def iternamedtuples(strategies_data):
+
+    strategy=namedtuple("strategy",["Strategy","Period","Parameters"])
+    strategy_list=[]
+    for row in strategies_data.index:
+
+        period=strategies_data.loc[row][0]
+
+        strategy_1=strategy(row,period,strategies_data.loc[row][1:].tolist())
+
+        strategy_list.append(strategy_1)
+
+    return strategy_list
+
+
+def read_from_excel(input_file_path):
+
+    wb=openpyxl.load_workbook(input_file_path)
+
+    sheet_name=wb.get_sheet_names()
+    dataframes={}
+
+    for sheet in sheet_name:
+        dataframes[sheet]=pd.DataFrame(wb.get_sheet_by_name(sheet).values)
+        dataframes[sheet].columns=dataframes[sheet].iloc[0]
+        dataframes[sheet].drop(0,inplace=True)
+        dataframes[sheet].set_index(dataframes[sheet].columns[0],drop=True,inplace=True)
+
+    return dataframes
+
+
