@@ -20,41 +20,19 @@ def single_instrument_single_system(strategy,period,parameters,price_data):
 
     strategy_func=getattr(method,strategy)
 
+    if period is None: period=""
 
-
-    trades, price_signal = strategy_func(price_data,parameters,period=period)
+    trades, price_signal = strategy_func(price_data,*parameters,period=period)
 
     trade_summary_data = trade_summary.trade_summary(trades)
 
     trades_table = trade_summary.trade_data_table(trades)
 
-    trades_12m_rolling_summary = rolling_12m_trade_summary.rolling_12m_trade_summary(trades, price_data)
+    pnl_series, _ = pg.pnl_timeseries_monthly_rebalance(trades, price_data, 1000000)
 
-    walk_forward_annual_summary = walkforward_annual_summary.walkforward_trade_summary(trades, price_data)
+    print(f"{strategy} ok!")
 
-    trade_distribution, freq_dist = trade_distribution.trade_distribution(trades_table)
-
-    # pnl_series,DD_distribution = pg.pnl_timeseries_same_value_trade(trades, price_data, 1000000)
-
-    pnl_series, DD_distribution = pg.pnl_timeseries_monthly_rebalance(trades, price_data, 1000000)
-
-    pnl_series_monthly = pd.DataFrame(columns=["PNL", "DD"])
-    pnl_series_annual = pd.DataFrame(columns=["PNL", "DD"])
-
-    pnl_series_monthly["PNL"] = pnl_series["%PNL"].resample("M").sum()
-    pnl_series_monthly["DD"], *_ = pg.DD_sum(pnl_series_monthly["PNL"].cumsum(), 1)
-
-    pnl_series_monthly_rolling_12m = pnl_series_monthly["PNL"].rolling(12).sum()
-    pnl_series_monthly_rolling_12m.fillna(0, inplace=True)
-
-    pnl_series_annual["PNL"] = pnl_series["%PNL"].resample("Y").sum()
-    pnl_series_annual["DD"], *_ = pg.DD_sum(pnl_series_annual["PNL"].cumsum(), 1)
-
-
-
-    print("ok!")
-
-    return 1
+    return pnl_series["PNL"], trade_summary_data.iloc[0]
 
 
 
