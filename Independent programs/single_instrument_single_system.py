@@ -2,7 +2,7 @@
 import pandas as pd
 from pathlib import Path
 
-from Strategies import assymetric_system as system
+from Strategies import rocma_system as system
 from Trade_Analysis import trade_distribution, trade_summary, rolling_12m_trade_summary
 from Trade_Analysis import walkforward_annual_summary
 from PNL_Generation import pnl_generation as pg
@@ -11,7 +11,7 @@ import warnings
 
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
-    symbol = "Nifty Index"
+    symbol = "Nz1 Index"
 
     file_path = Path().absolute().joinpath("Data/Price_data")
 
@@ -20,15 +20,15 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/Assymetric_Monthly"+"/Nifty Index"
+    underlying_name = "Results/ROCMA_Daily/"+symbol
 
-    period_1=5
-    period_2 = 10
+    period_1=27
+    period_2 = 18
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = system.assymetric_system(price_data,period_1,period_2,period="")
+    trades, price_signal = system.rocma_system(price_data,period_1,period_2,period="")
 
     trade_summary_data = trade_summary.trade_summary(trades)
 
