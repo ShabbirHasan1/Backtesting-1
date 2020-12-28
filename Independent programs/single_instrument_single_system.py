@@ -51,12 +51,12 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/vortex_Daily/"+symbol
+    underlying_name = "Results/rocma_Daily/"+symbol
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = vortex_system.vortex_system(price_data,period="")
+    trades, price_signal = rocma_system.rocma_system(price_data,period="")
 
     trade_summary_data = trade_summary.trade_summary(trades)
 
