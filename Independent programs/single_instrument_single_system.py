@@ -51,22 +51,19 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/ROCMA_Daily/"+symbol
-
-    period_1=10
-    period_2 = 25
-    period_3=40
+    underlying_name = "Results/vortex_Daily/"+symbol
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = roc_system.roc_system(price_data,period_1,period_2,period_3,period="")
+    trades, price_signal = vortex_system.vortex_system(price_data,period="")
 
     trade_summary_data = trade_summary.trade_summary(trades)
 
     trades_table = trade_summary.trade_data_table(trades)
 
-    trades_12m_rolling_summary = rolling_12m_trade_summary.rolling_12m_trade_summary(trades, price_data)
+    trades_12m_rolling_summary=pd.DataFrame()
+    #trades_12m_rolling_summary = rolling_12m_trade_summary.rolling_12m_trade_summary(trades, price_data)
 
     walk_forward_annual_summary = walkforward_annual_summary.walkforward_trade_summary(trades, price_data)
 
