@@ -62,8 +62,8 @@ if __name__ == '__main__':
 
     trades_table = trade_summary.trade_data_table(trades)
 
-    trades_12m_rolling_summary=pd.DataFrame()
-    #trades_12m_rolling_summary = rolling_12m_trade_summary.rolling_12m_trade_summary(trades, price_data)
+    #trades_12m_rolling_summary=pd.DataFrame()
+    trades_12m_rolling_summary = rolling_12m_trade_summary.rolling_12m_trade_summary(trades, price_data)
 
     walk_forward_annual_summary = walkforward_annual_summary.walkforward_trade_summary(trades, price_data)
 
