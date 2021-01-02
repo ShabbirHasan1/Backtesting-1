@@ -18,9 +18,6 @@ def oscillator_system(price_data, period="", trade_type="Both_leg", underlying_i
 
     price_signal_period["Signal"] = price_signal_period["Oscillator"].apply(signal_generator)
 
-    # price_signal_period["Signal"] = np.where((price_signal_period["Oscillator"] >= 1), 1,
-    #                                  np.where((price_signal_period["Oscillator"] <= -1), -1, 0))
-
     price_signal["Signal"] = price_signal_period["Signal"].resample("D").ffill()
     price_signal["Signal"] = price_signal["Signal"].shift(1)
     price_signal["Signal"].fillna(0, inplace=True)

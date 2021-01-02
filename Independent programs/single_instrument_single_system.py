@@ -35,10 +35,6 @@ def single_instrument_single_system(strategy,period,parameters,price_data):
     return pnl_series["PNL"], trade_summary_data.iloc[0]
 
 
-
-
-
-
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
 
@@ -51,12 +47,12 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/rs2sma50sl2_Daily/"+symbol
+    underlying_name = "Results/seasonal_short_Daily/"+symbol
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = rsi2sma50sl2_system.rsi2sma50sl2_system(price_data,period="")
+    trades, price_signal = seasonal_short_system.seasonal_short_system(price_data,16,22,period="")
 
     trade_summary_data = trade_summary.trade_summary(trades)
 
