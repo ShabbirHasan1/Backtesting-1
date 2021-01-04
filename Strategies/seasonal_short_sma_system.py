@@ -7,21 +7,45 @@ from Trade_Generation import creating_individual_trade
 
 def signal_generation(price_signal_period,entry_date,exit_date):
 
-    for i in price_signal_period.index:
-        if i==price_signal_period.index[0]:
-            previous_day=i
-            price_signal_period["signal"]=0
-            continue
 
-        if (i.day > entry_date) and (previous_day.day<=entry_date):
-            price_signal_period["signal"] = price_signal_period[previous_day]["sma_signal"]
-        elif (i.day > exit_date) and (previous_day.day<=exit_date):
-            price_signal_period["signal"] = 0
+    days=price_signal_period.itertuples()
+    next_day=price_signal_period.itertuples()
+    next(next_day)
+
+    for row in days:
+        if row.Index == price_signal_period.index[-1]:
+            break
         else:
-            price_signal_period["signal"] = np.nan
-        previous_day=i
+            next_day_values=next(next_day)
+            if next_day_values.Index.day>entry_date:
+                entry_month = row.Index.month
 
-    return price_signal_period["signal"]
+                if row.sma_signal==-1:
+                    if entry_date<exit_date:
+                        while next_day_values.Index.month==entry_month:
+                            if next_day_values.Index.day<=exit_date:
+                                price_signal_period["Signal"][row.Index] = -1
+                            else:
+                                price_signal_period["Signal"][row.Index] = 0
+                            row=next(days)
+                            next_day_values=next(next_day)
+                    else:
+                        while True:
+                            if ((next_day_values.Index.day>exit_date) and (next_day_values.Index.month!=entry_month)):
+                                price_signal_period["Signal"][row.Index] = 0
+                                break
+                            price_signal_period["Signal"][row.Index] = -1
+                            row=next(days)
+                            next_day_values=next(next_day)
+                else:
+                    while (next_day_values.Index.month==entry_month):
+                        price_signal_period["Signal"][row.Index] = 0
+                        row=next(days)
+                        next_day_values = next(next_day)
+            else:
+                price_signal_period["Signal"][row.Index] = 0
+
+    return price_signal_period["Signal"]
 
 
 def seasonal_short_sma_system(price_data,period_sma=10,entry_date=16,exit_date=22,period="", trade_type="Both_leg", underlying_instrument_data=None):
@@ -42,11 +66,11 @@ def seasonal_short_sma_system(price_data,period_sma=10,entry_date=16,exit_date=2
 
     price_signal_period["sma_signal"]=np.where(price_signal_period["Close"]<price_signal_period[period_str],-1,0)
 
+    price_signal_period["Signal"]=np.nan
     price_signal_period["Signal"] = signal_generation(price_signal_period,entry_date,exit_date)
     price_signal_period["Signal"].fillna(method="ffill",inplace=True)
 
     price_signal["Signal"] = price_signal_period["Signal"].resample("D").ffill()
-    price_signal["Signal"] = price_signal["Signal"].shift(1)
     price_signal["Signal"].fillna(0, inplace=True)
 
     price_signal["Trades"] = price_signal["Signal"] - price_signal["Signal"].shift(1)
