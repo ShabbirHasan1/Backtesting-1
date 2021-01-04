@@ -47,12 +47,12 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/seasonal_short_sma_Daily/"+symbol
+    underlying_name = "Results/expanding_bollinger_band_Daily/"+symbol
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = seasonal_short_sma_system.seasonal_short_sma_system(price_data,10,22,2,period="")
+    trades, price_signal = expanding_bollinger_band_system.expanding_bollinger_band_system(price_data,10,period="")
 
     trade_summary_data = trade_summary.trade_summary(trades)
 
