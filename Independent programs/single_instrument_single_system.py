@@ -52,7 +52,7 @@ if __name__ == '__main__':
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = seasonal_short_system.seasonal_short_system(price_data,16,22,period="")
+    trades, price_signal = seasonal_short_sma_system.seasonal_short_sma_system(price_data,10,16,22,period="")
 
     trade_summary_data = trade_summary.trade_summary(trades)
 

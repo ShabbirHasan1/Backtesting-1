@@ -1,13 +1,34 @@
+import numpy as np
+
 from Technical_Indicators import sma as sma
 from Timeframe_Manipulation import series_resampling as series_resampling
 from Trade_Generation import trade_generation as tc
 from Trade_Generation import creating_individual_trade
 
-def seasonal_short_system(price_data,period_sma=10,entry_date=16,exit_date=22,period="", trade_type="Both_leg", underlying_instrument_data=None):
+def signal_generation(price_signal_period,entry_date,exit_date):
+
+    for i in price_signal_period.index:
+        if i==price_signal_period.index[0]:
+            previous_day=i
+            price_signal_period["signal"]=0
+            continue
+
+        if (i.day > entry_date) and (previous_day.day<=entry_date):
+            price_signal_period["signal"] = price_signal_period[previous_day]["sma_signal"]
+        elif (i.day > exit_date) and (previous_day.day<=exit_date):
+            price_signal_period["signal"] = 0
+        else:
+            price_signal_period["signal"] = np.nan
+        previous_day=i
+
+    return price_signal_period["signal"]
+
+
+def seasonal_short_sma_system(price_data,period_sma=10,entry_date=16,exit_date=22,period="", trade_type="Both_leg", underlying_instrument_data=None):
 
     period=""
 
-    period_str=str(period_sma)+"_sma"
+    period_str=str(period_sma)+"_SMA"
 
     if period == "":
         price_period = price_data
@@ -19,16 +40,10 @@ def seasonal_short_system(price_data,period_sma=10,entry_date=16,exit_date=22,pe
 
     sma.sma(price_signal_period, period_sma)
 
-    price_signal_period["Signal"]=-1
+    price_signal_period["sma_signal"]=np.where(price_signal_period["Close"]<price_signal_period[period_str],-1,0)
 
-    if entry_date<exit_date:
-        price_signal_period["Signal"][price_signal_period.index.day > exit_date] = 0
-        price_signal_period["Signal"][ price_signal_period.index.day <= entry_date] = 0
-    else:
-        price_signal_period["Signal"][price_signal_period.index.day > exit_date] = 0
-        price_signal_period["Signal"][price_signal_period.index.day > entry_date] = -1
-
-    price_signal_period.loc[price_signal_period["Signal"].shift(-1)==-1,"Signal"] = -1
+    price_signal_period["Signal"] = signal_generation(price_signal_period,entry_date,exit_date)
+    price_signal_period["Signal"].fillna(method="ffill",inplace=True)
 
     price_signal["Signal"] = price_signal_period["Signal"].resample("D").ffill()
     price_signal["Signal"] = price_signal["Signal"].shift(1)
