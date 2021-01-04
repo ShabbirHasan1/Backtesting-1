@@ -13,33 +13,38 @@ def signal_generation(price_signal_period, profit_target, trailing_stop):
     trade_side = 0
 
     for day in day_data:
+        if day.Close == 1351:
+            print("Hey")
 
         if day.Index == price_signal_period.index[0]:
             previous_day = day
         else:
-            if previous_day.Trade_signal == 0 and day.Trade_signal != 0:
+            if previous_day.Trade_signal == 0 and day.Trade_signal != 0 and day.Trade_signal!=trade_side:
                 price_signal_period["Signal"][day.Index] = day.Trade_signal
-                trade_side = day.Signal
+                trade_side = day.Trade_signal
                 trade_entry = day.Close
-            elif previous_day.Signal != 0:
+            elif trade_side != 0:
                 current_profit = ((day.Close - trade_entry) / trade_entry) * trade_side
                 if (current_profit > profit_target) or (current_profit < trailing_stop):
                     price_signal_period["Signal"][day.Index] = 0
-                elif previous_day.Signal == 1 and (day.High < previous_day.Upper_band):
+                    trade_side=0
+                elif trade_side == 1 and (day.High < previous_day.Upper_band):
                     price_signal_period["Signal"][day.Index] = 0
-                elif previous_day.Signal == -1 and (day.Low > previous_day.Lower_band):
+                    trade_side=0
+                elif trade_side == -1 and (day.Low > previous_day.Lower_band):
                     price_signal_period["Signal"][day.Index] = 0
+                    trade_side=0
                 else:
-                    price_signal_period["Signal"][day.Index] = previous_day.Signal
+                    price_signal_period["Signal"][day.Index] = trade_side
             else:
-                price_signal_period["Signal"][day.Index]= previous_day.Signal
+                price_signal_period["Signal"][day.Index]= 0
 
         previous_day = day
 
 
 def body_outside_band_system(price_data, period1=20, bandwidth=1, profit_target=6, trailing_stop=2, period="",
                              trade_type="Both_leg", underlying_instrument_data=None):
-    trailing_stop = trailing_stop / 100
+    trailing_stop = - trailing_stop / 100
     profit_target = profit_target / 100
     bandwidth = bandwidth / 100
     period_ema = str(period1) + "_EMA"
