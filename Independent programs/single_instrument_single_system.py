@@ -40,6 +40,9 @@ if __name__ == '__main__':
 
     symbol = "Nz1 Index"
 
+    strategy_name="shooting_star"
+
+
     file_path = Path().absolute().joinpath("Data/Price_data")
 
     price_data = pd.read_csv(file_path.joinpath(symbol + ".csv"))
@@ -47,12 +50,12 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/technical_setups_Daily/"+symbol
+    underlying_name = "Results/island_reversal_Daily/"+symbol
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = technical_setups_system.bullish_engulfing_system(price_data,period="")
+    trades, price_signal = island_reversal_system.island_reversal_system(price_data,period="")
 
     trade_summary_data = trade_summary.trade_summary(trades)
 

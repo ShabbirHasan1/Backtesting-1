@@ -1,19 +1,23 @@
-from Technical_Indicators import bullish_engulfing as indicator1
+from Technical_Indicators import *
 from Timeframe_Manipulation import series_resampling as series_resampling
 from Trade_Generation import trade_generation as tc
 from Trade_Generation import creating_individual_trade
 
 import numpy as np
 
-def bullish_engulfing_system(price_data, period1=20, period="",trade_type="Both_leg", underlying_instrument_data=None):
+def technical_setups_system(price_data,indicator="bullish_engulfing", period1=20, period="",trade_type="Both_leg", underlying_instrument_data=None):
 
     if period=="":
         price_period=price_data
     else:
         price_period=series_resampling.price_series_periodic(price_data,period)
 
+    method_name = indicator
+    method = eval(method_name)
 
-    indicator1.bullish_engulfing(price_period)
+    strategy_func=getattr(method,indicator)
+
+    strategy_func(price_period)
 
     price_signal_period = price_period
 
