@@ -50,12 +50,12 @@ if __name__ == '__main__':
     price_data.columns = ["Open", "High", "Low", "Close", "Volume"]
     price_data.index = pd.to_datetime(price_data.index, format="%d-%m-%Y")
 
-    underlying_name = "Results/island_reversal_Daily/"+symbol
+    underlying_name = "Results/regression_crossover_Weekly/"+symbol
 
     initial_capital = 1000000
     trading_cost = 0.0000
 
-    trades, price_signal = island_reversal_system.island_reversal_system(price_data,period="")
+    trades, price_signal = regression_crossover_system.regression_crossover_system(price_data,period="W")
 
     trade_summary_data = trade_summary.trade_summary(trades)
 
