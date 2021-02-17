@@ -6,7 +6,7 @@ from Trade_Generation import creating_individual_trade
 import numpy as np
 
 
-def rsi2_system(price_data, period_rsi, period="", trade_type="Both_leg",
+def rsi2_system(price_data, period_rsi=2, period="", trade_type="Both_leg",
                       underlying_instrument_data=None):
 
     if period == "":

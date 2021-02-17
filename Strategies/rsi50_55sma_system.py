@@ -6,7 +6,7 @@ from Trade_Generation import creating_individual_trade
 import numpy as np
 
 
-def rsi50_55sma_system(price_data, period_sma, period_rsi, period="", trade_type="Both_leg",
+def rsi50_55sma_system(price_data, period_sma=55, period_rsi=14, period="", trade_type="Both_leg",
                        underlying_instrument_data=None):
 
     period_sma_str=str(period_sma)+"_SMA"

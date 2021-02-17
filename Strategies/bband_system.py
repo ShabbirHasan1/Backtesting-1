@@ -6,7 +6,7 @@ from Trade_Generation import creating_individual_trade
 import numpy as np
 
 
-def bband_system(price_data, period1, period="", trade_type="Both_leg", underlying_instrument_data=None):
+def bband_system(price_data, period1=10, period="", trade_type="Both_leg", underlying_instrument_data=None):
     period_sma = str(period1) + "_SMA"
 
     if period == "":

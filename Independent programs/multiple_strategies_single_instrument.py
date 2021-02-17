@@ -14,7 +14,7 @@ import warnings
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
 
-    symbol = "NZ1 Index"
+    symbol = "AF1 Index"
 
     file_path = Path().absolute().joinpath("Data/Price_data")
 

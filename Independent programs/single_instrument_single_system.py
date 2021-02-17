@@ -32,7 +32,7 @@ def single_instrument_single_system(strategy,period,parameters,price_data):
 
     print(f"{strategy} ok!")
 
-    return pnl_series["PNL"], trade_summary_data.iloc[0]
+    return pnl_series, trade_summary_data.iloc[0]
 
 
 if __name__ == '__main__':

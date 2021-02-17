@@ -5,7 +5,7 @@ from Trade_Generation import creating_individual_trade
 
 import numpy as np
 
-def sma_crossover_system(price_data, period1, period="",trade_type="Both_leg", underlying_instrument_data=None):
+def sma_crossover_system(price_data, period1=100, period="",trade_type="Both_leg", underlying_instrument_data=None):
     period_sma = str(period1) + "_SMA"
 
     if period=="":

@@ -1,9 +1,15 @@
+'''
+this is a collection of several functions to be used across various programs
+'''
+
 from pathlib import Path
 import pandas as pd
 import os
 import openpyxl
 from collections import namedtuple
 
+# this fuction converts the datetime data in the dataframe to YYYY-mmm-dd format.
+# use this function before saving dataframe in excel of csv
 
 def convert_datetime(data_frame):
     cols = data_frame.select_dtypes('datetime64')
@@ -11,6 +17,9 @@ def convert_datetime(data_frame):
 
     return data_frame
 
+# this function is used to create csv's for each dataframe in the dataframes list
+# input: list of dataframes, directory name where csv's have to be stored
+# output: no returns, csv's will be created for each dataframe
 
 def csv_creation(data_frames, dir_name):
     output_dir=Path().absolute().joinpath(dir_name)
@@ -20,6 +29,9 @@ def csv_creation(data_frames, dir_name):
         output_file = i.name + '.csv'
         i.to_csv(output_dir / output_file)  # can join path elements with / operator
 
+# reading price data from csv file at the give location
+# input: file path, file must contain Dates, Open, High, Low, close, Volume data
+# returns price data: dataframe with price data and date as index
 
 def reading_price_data_from_csv(file_path):
     price_data = pd.read_csv(file_path)
@@ -29,6 +41,9 @@ def reading_price_data_from_csv(file_path):
 
     return price_data
 
+# reading trades data from csv file at given location
+# input: file location, should have column "Date"
+# output: dataframe with trade data
 
 def reading_trades_from_csv(file_path):
     trades = pd.read_csv(file_path, header=0, parse_dates=True)
@@ -36,6 +51,10 @@ def reading_trades_from_csv(file_path):
 
     return trades
 
+# import price data of multiple symbols from a given folder
+# input: folder path, symbols
+# folder path should containg files with price data of individual instruments
+# output: dictionary of dataframes with symbols keyword and price data as dataframe
 
 def import_price_data_from_csv_files(folder_path, symbols):
     price_data = {}
@@ -46,9 +65,22 @@ def import_price_data_from_csv_files(folder_path, symbols):
         price_data_name.columns = ["Open", "High", "Low", "Close", "Volume"]
         price_data_name.index = pd.to_datetime(price_data_name.index, format="%d-%m-%Y")
 
+        #cleaning price data
+        price_data_name=price_data_name.loc[price_data_name.index.dropna()]
+        price_data_name["Volume"].fillna(0,inplace=True)
+        price_data_name["Close"].fillna(method="ffill",inplace=True)
+        price_data_name.fillna(method="bfill",axis=1,inplace=True)
+
+
         price_data[symbol] = price_data_name
 
     return price_data
+
+# imports the price data from all the files in the given folder
+# it first creates a list of name of all the csv files in the folder
+# then it send the folder pathe and list to the "import_price_data_from_csv_files" function to extract price data from those files
+# input: folder path where price data is available
+# output: price data dictionary with symbol as keyword
 
 def import_all_price_data_from_csv_files(folder_path):
 
@@ -61,6 +93,10 @@ def import_all_price_data_from_csv_files(folder_path):
 
     return price_data
 
+# creates excel file with dataframes stores in seperate sheets
+# input: folder path, data-frames list and excel name
+# output: none
+
 def excel_creation(data_frames, dir_name,excel_name):
 
     output_dir=Path().absolute().joinpath(dir_name)
@@ -72,6 +108,10 @@ def excel_creation(data_frames, dir_name,excel_name):
         for n, df in enumerate(data_frames):
             df.to_excel(writer, sheet_name=data_frames[n].name)
         writer.save()
+
+# reading a list of strategies from "Strategies.xlsx" file at the given file pathe
+# the output has named tuples with strategies and associated parameter values to be used
+
 
 def reading_list_of_strats_from_excel(input_file_path):
 
@@ -87,6 +127,11 @@ def reading_list_of_strats_from_excel(input_file_path):
 
     return strategy_list
 
+# function helps to map strategy with assocaiated variabkes and parameters
+# it creates a list of named tuples where strategy name is assocaited with a
+# list containing parameters values to be used
+
+
 def iternamedtuples(strategies_data):
 
     strategy=namedtuple("strategy",["Strategy","Period","Parameters"])
@@ -101,6 +146,8 @@ def iternamedtuples(strategies_data):
 
     return strategy_list
 
+# function reads from the excel stored at given file path and
+# stores data in different sheet in different dataframes
 
 def read_from_excel(input_file_path):
 

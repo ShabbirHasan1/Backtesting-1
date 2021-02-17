@@ -5,7 +5,7 @@ from Trade_Generation import creating_individual_trade
 import numpy as np
 
 
-def assymetric_system(price_data, period_1, period_2, period="", trade_type="Both_leg", underlying_instrument_data=None):
+def assymetric_system(price_data, period_1=10, period_2=20, period="", trade_type="Both_leg", underlying_instrument_data=None):
 
     if period=="":
         price_period=price_data
