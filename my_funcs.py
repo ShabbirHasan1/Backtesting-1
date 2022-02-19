@@ -113,9 +113,8 @@ def excel_creation(data_frames, dir_name,excel_name):
 # the output has named tuples with strategies and associated parameter values to be used
 
 
-def reading_list_of_strats_from_excel(input_file_path):
+def reading_list_of_strats_from_excel(input_file_path,input_file_name = "Strategies.xlsx"):
 
-    input_file_name = "Strategies.xlsx"
     input_file = input_file_path / input_file_name
 
     strategies=read_from_excel(input_file)
@@ -126,6 +125,18 @@ def reading_list_of_strats_from_excel(input_file_path):
     strategy_list=iternamedtuples(strategies_data)
 
     return strategy_list
+
+#reading a list of symbols from "Symbols.xlsx" file at the given file path
+# the output has list with symbols
+
+def reading_list_of_symbols_from_excel(input_file_path):
+    input_file_name="Symbols.xlsx"
+    input_file=input_file_path/input_file_name
+
+    symbols_dict=read_from_excel(input_file)
+    symbols=list(symbols_dict["Straregies"].index.values)
+
+    return symbols
 
 # function helps to map strategy with assocaiated variabkes and parameters
 # it creates a list of named tuples where strategy name is assocaited with a
