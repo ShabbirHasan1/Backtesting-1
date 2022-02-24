@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from Technical_Indicators import rsc as rsc
+from Technical_Indicators import rsi as rsi
 from pathlib import Path
 import my_funcs
 import datetime
@@ -14,15 +14,15 @@ def creating_universe(combined_portfolio_list,dates):
 
     return universe_daily_stocks
 
-def creating_portfolio(cash_price_data,universe_stocks,trade_days,universal_dates,period=10):
+def creating_portfolio(cash_price_data,universe_stocks,trade_days,universal_dates,period=14):
 
     cash_symbols_data_list=pd.Series(cash_price_data.keys())
 
     buy_portfolio=pd.DataFrame()
     sell_portfolio=pd.DataFrame()
-    RSC_universe=pd.DataFrame()
+    RSI_universe=pd.DataFrame()
     monthly_universe_portfolios=pd.DataFrame()
-    daily_rsc=pd.DataFrame(0,columns=cash_symbols_data_list,index=universal_dates)
+    daily_rsi=pd.DataFrame(0,columns=cash_symbols_data_list,index=universal_dates)
 
 
     universe_stocks_daily=creating_universe(universe_stocks,universal_dates)
@@ -30,7 +30,8 @@ def creating_portfolio(cash_price_data,universe_stocks,trade_days,universal_date
 
     for stock in cash_symbols_data_list:
 
-        daily_rsc[stock]=rsc.rsc(cash_price_data[stock],nifty_data,period)
+        daily_rsi[stock]=rsi.rsi(cash_price_data[stock],period)
+        print(f"rsi done for--{stock}")
 
 
     for expiry_day in expiry_days_stocks.index:
@@ -39,31 +40,31 @@ def creating_portfolio(cash_price_data,universe_stocks,trade_days,universal_date
         monthly_universe.dropnna(inplace=True)
         monthly_universe=monthly_universe[monthly_universe!="TTMT/A IN Equity"]
         monthly_universe=monthly_universe.to_frame().reset_index()
-        monthly_universe["RSC"]=0
+        monthly_universe["RSI"]=0
         monthly_universe.drop(["index"],axis=1,inplace=True)
         monthly_universe.set_index(monthly_universe.columns[0],inplace=True)
 
-        rsc_numbers=daily_rsc.loc[expiry_day]
-        monthly_universe["RSC"]=rsc_numbers
+        rsi_numbers=daily_rsi.loc[expiry_day]
+        monthly_universe["RSI"]=rsi_numbers
 
-        buy_p=pd.DataFrame(monthly_universe["RSC"].astype(float).nsmallest(10,keep="all").index)
-        sell_p = pd.DataFrame(monthly_universe["RSC"].astype(float).nlargest(10, keep="all").index)
+        buy_p=pd.DataFrame(monthly_universe["RSI"].astype(float).nsmallest(10,keep="all").index)
+        sell_p = pd.DataFrame(monthly_universe["RSI"].astype(float).nlargest(10, keep="all").index)
 
         buy_portfolio=buy_portfolio.append(buy_p.T)
         sell_portfolio=sell_portfolio.append(sell_p.T)
-        RSC_universe=RSC_universe.append(monthly_universe.T)
+        RSI_universe=RSI_universe.append(monthly_universe.T)
         monthly_universe_portfolios=monthly_universe_portfolios.append(pd.DataFrame(monthly_universe.index).T)
 
     buy_portfolio["expiry_days"]=expiry_days_stocks.index
     buy_portfolio.set_index("expiry_days",inplace=True)
     sell_portfolio["expiry_days"]=expiry_days_stocks.index
     sell_portfolio.set_index("expiry_days",inplace=True)
-    RSC_universe["expiry_days"]=expiry_days_stocks.index
-    RSC_universe.set_index("expiry_days",inplace=True)
+    RSI_universe["expiry_days"]=expiry_days_stocks.index
+    RSI_universe.set_index("expiry_days",inplace=True)
     monthly_universe_portfolios["expiry_days"]=expiry_days_stocks.index
     monthly_universe_portfolios.set_index("expiry_days",inplace=True)
 
-    return buy_portfolio,sell_portfolio,monthly_universe_portfolios,RSC_universe
+    return buy_portfolio,sell_portfolio,monthly_universe_portfolios,RSI_universe
 
 
 if __name__=="__main__":
@@ -97,14 +98,14 @@ if __name__=="__main__":
     expiry_days=expiry_days[expiry_days.between(portfolio_start_date,portfolio_end_date)]
     universe_stocks=pd.read_csv(universe_stocks_path)
 
-    buy_portfolio,sell_portfolio,monthly_universe_portfolios,RSC_universe = creating_portfolio(cash_price_data, universe_stocks, expiry_days, universal_dates,10)
+    buy_portfolio,sell_portfolio,monthly_universe_portfolios,RSI_universe = creating_portfolio(cash_price_data, universe_stocks, expiry_days, universal_dates,10)
 
     buy_portfolio.name="Buy Portfolio"
     sell_portfolio.name="Sell Portfolio"
-    RSC_universe.name="RSC reversion"
+    RSI_universe.name="RSI reversion"
     monthly_universe_portfolios.name="Monthly Universe"
 
-    to_be_saved_as_file=[buy_portfolio,sell_portfolio,RSC_universe,monthly_universe_portfolios]
-    my_funcs.excel_creation(to_be_saved_as_file,"Portfolio Results/RSC reversion","RSC_Nifty")
+    to_be_saved_as_file=[buy_portfolio,sell_portfolio,RSI_universe,monthly_universe_portfolios]
+    my_funcs.excel_creation(to_be_saved_as_file,"Portfolio Results/RSI reversion","RSI_Nifty")
 
 
