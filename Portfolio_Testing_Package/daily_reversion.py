@@ -15,7 +15,6 @@ def creating_universe(combined_portfolio_list,dates):
 
 def creating_portfolio(cash_price_data,nifty_data,universe_stocks,trade_days,universal_dates):
 
-    global monthly_universe
     cash_symbols_data_list=pd.Series(cash_price_data.keys())
     universe_stocks_daily=creating_universe(universe_stocks,universal_dates)
     daily_close_price=pd.DataFrame(0,columns=cash_symbols_data_list,index=universal_dates)
