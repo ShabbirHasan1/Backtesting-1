@@ -382,6 +382,123 @@ def combined_portfolio_pnl_generation(universal_dates,expiry_days,baseamount,exp
                 previou_month_aum=start_of_month_Total_AUM
                 start_of_month_Total_AUM=portfolio_values.loc[current_day,"PNL"]+previous_day_AUM
 
+                for strategy in strategy_list:
+                    strategy_details.loc[strategy,"Current_AUM"]=start_of_month_Total_AUM*strategy_details.loc[strategy,"Weightage"]
+                    current_month_strategy_positions=strategy_position[strategy]
+                    current_month_strategy_positions=current_month_strategy_positions[current_month_strategy_positions.abs()>1]
+                    next_month_strategy_price=todays_close_price[current_month_strategy_positions.index]
+                    if strategy=="Stock_Momentum":
+                        per_stock_value=(strategy_details.loc[strategy,"Current_AUM"]*0.035)
+                        current_month_momentum_qty=current_month_strategy_positions.abs()/current_month_momentum_qty
+                        current_month_momentum_qty=current_month_momentum_qty[next_month_strategy_price.index]
+                        next_month_positions=per_stock_value/next_month_strategy_price
+                        next_month_positions=np.sign(current_month_strategy_positions)*next_month_positions
+                        month_end_trade_required=next_month_positions-current_month_strategy_positions
+                        if "Nz1 Index" in month_end_trade_required.index:
+                            month_end_trade_required.drop("Nz1 Index", inplace=True)
+
+                    else:
+                        adjustment_factor=(start_of_month_Total_AUM/previou_month_aum)
+                        next_month_positions=current_month_strategy_positions*adjustment_factor
+                        month_end_trade_required=next_month_positions=current_month_strategy_positions
+
+                    trade_list=create_trade_line(month_end_trade_required,"",strategy,current_day,todays_close_price)
+                    strategy_position[strategy]=update_positions(trade_list,strategy_position[strategy])
+
+                    todays_trade=pd.concat([todays_trade,trade_list],axis=0)
+
+                    strategy_exposure[strategy]=strategy_position[strategy]*todays_close_price
+                    strategy_exposure_in_perc[strategy]=strategy_exposure[strategy]/((start_of_month_Total_AUM*strategy_details.loc[strategy,"Weightage"]))
+                    strategy_net_exposure.loc[current_day,strategy]=(strategy_exposure[strategy].sum())/(strategy_details.loc[strategy,"Current_AUM"])
+                    strategy_gross_exposure.loc[current_day,strategy]=(strategy_exposure[strategy].abs().sum())/(strategy_details.loc[strategy,"Current_AUM"])
+
+
+            #creating trade lines for stock Momentum hedge with nifty
+
+            strategy_exposure["Stock_Momentum"]=strategy_position["Stock_Momentum"]*todays_close_price
+            strategy_exposure_in_perc["Stock_Momentum"]=strategy_exposure["Stock_Momentum"]/(start_of_month_Total_AUM*strategy_details.loc["Stock_Momentum","Weightage"])
+            net_stock_exposure_stock_momentum=strategy_exposure["Stock_Momentum"].sum()-strategy_exposure.loc["Nz1 Index","Stock_momentum"]
+            stock_momentum_hedge_required=-1*(net_stock_exposure_stock_momentum)/todays_close_price["Nz1 Index"]
+
+            todays_nifty_hedge_trade=stock_momentum_hedge_required-current_stock_momentum_hedge
+            current_stock_momentum_hedge=stock_momentum_hedge_required
+            strategy_position.loc["Nz1 Index","Stock_Momentum"]=stock_momentum_hedge_required
+
+            strategy_exposure["Stock_Momentum"]=strategy_position["Stock_Momentum"]*todays_close_price
+            strategy_exposure_in_perc["Stock_Momentum"]=strategy_exposure["Stock_Momentum"]/(start_of_month_Total_AUM*strategy_details.loc["Stock_Momentum","Weightage"])
+            strategy_net_exposure.loc[current_day, "Stock_Momentum"] = (strategy_exposure["Stock_Momentum"].sum()) / (previous_day_AUM*strategy_details.loc["Stock_Momentum", "Weightage"])
+            strategy_gross_exposure.loc[current_day, "Stock_Momentum"] = (strategy_exposure["Stock_Momentum"].abs().sum()) / (previous_day_AUM*strategy_details.loc["Stock_Momentum", "Weightage"])
+
+            new_trade_line=["Nifty Hedge","Stock_Momentum",current_day,todays_nifty_price,np.sign(todays_nifty_hedge_trade),"Nz1 Index","Nz1 Index",
+                            "F",abs(todays_nifty_hedge_trade),0,0]
+
+            todays_trade.reset_index(inplace=True,drop=True)
+            todays_trade.loc[len(todays_trade.index)]=new_trade_line
+            # block for nifty hedge calculation ends here
+
+            daily_exposure[current_day]=strategy_position["DailyMR"]
+            weekly_exposure[current_day]=strategy_position["Weekly_MR"]
+            sn_exposure[current_day]=strategy_position["SN"]
+            ESA_exposure[current_day]=strategy_position["ESA"]
+            stock_momentum_exposure[current_day]=strategy_position["Stock_Momentum"]
+            rsi_exposure[current_day]=strategy_position["RSI"]
+            rsc_exposure[current_day]=strategy_position["RSC"]
+            d90_vol_exposure[current_day]=strategy_position["90D_Volatility"]
+            M12_M1_ret_exposure[current_day]=strategy_position["M12-M1"]
+            SML_ret_exposure[current_day]=strategy_position["SML"]
+
+            net_trades=todays_trade[["Contract","Qty","Side"]]
+            net_trades["Positions"]=net_trades["Qty"]*net_trades["Side"]
+            net_trades=net_trades.groupby("Contract").sum(["Positions"])
+
+            todays_position=net_trades["Positions"]
+            current_positions["Close_price"]=todays_close_price
+
+            current_positions,adjustment_positions,position_adjustment_trades=check_for_exposure(current_positions,adjustment_positions,todays_position,previous_day_AUM)
+
+            if len(position_adjustment_trades.index)!=0:
+                trade_list=create_trade_line(position_adjustment_trades,"","Adjustment_trades",current_day,todays_close_price)
+                todays_trade=pd.concat([todays_trade,trade_list],axis=0)
+
+            positions_exceeded=current_positions[current_positions["Gross_exposure_in_perc"]>exposure_limit]
+            if "Nz1 Index" in positions_exceeded.index:
+                positions_exceeded=positions_exceeded.drop("Nz1 index")
+
+            if len(positions_exceeded)!=0:
+
+#                new_adjustment_trades=create_trade_line(positions_exceeded,"","Adjustment_trades",current_day,todays_close_price)
+#                todays_trade=pd.concat([todays_trade,new_adjustment_trades],axis=0)
+
+                for exceeded_position_stock in positions_exceeded.index:
+
+                    exceeded_amount_in_perc=positions_exceeded.loc[exceeded_position_stock]["Gross_exposure_in_perc"]-exposure_limit
+                    exceeded_amount_in_amount=exceeded_amount_in_perc*previous_day_AUM
+                    Account=""
+                    Strategy="Adjustment_trades"
+                    Date=current_day
+                    Price=todays_close_price[exceeded_position_stock]
+                    Side=1 if positions_exceeded.loc[exceeded_position_stock]["Exposure"] < 0 else -1
+                    Contract=exceeded_position_stock
+                    Underlying=exceeded_position_stock
+                    Contract_Type="F"
+                    Qty=exceeded_amount_in_amount/Price
+                    Trading_cost=0
+                    Strike_price=0
+
+                    new_adjustment_trades=[Account,Strategy,Date,Price,Side,Contract,Underlying,Contract_Type,Qty,Trading_cost,Strike_price]
+
+                    todays_trade.loc[len(todays_trade)]=new_adjustment_trades
+                    adjustment_positions.loc[exceeded_position_stock,"Position"]+=-1*Side*Qty
+                    current_positions.loc[exceeded_position_stock,"Position"]+=Qty*Side
+
+            current_positions["Previous_Close_price"]=yesterdays_close_price
+            current_positions["Exposure"]=current_positions["Close_price"]*current_positions["Position"]
+            current_positions["Exposure_in_perc"]=current_positions["Exposure"]/previous_day_AUM
+            current_positions["Gross_exposure_in_perc"]=current_positions["Exposure_in_perc"].abs()
+            adjustment_positions.loc["Close_price"]=todays_close_price
+            adjustment_positions.loc["Percentage"]=(adjustment_positions["Positions"]*adjustment_positions.loc["Close_price"])/previous_day_AUM
+
+            #update PNL for the day.current positions
 
 
 
