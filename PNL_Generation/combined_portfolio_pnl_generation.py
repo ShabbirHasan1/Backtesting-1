@@ -1,0 +1,387 @@
+import pandas as pd
+import numpy as np
+import openpyxl as xl
+import datetime
+from pathlib import Path
+import collections
+
+from Individual_Trades import Individual_Trades
+from Trade_Generation import creating_individual_trade,creating_individual_trade_db
+from Timeframe_Manipulation import series_resampling as tm
+from PNL_Generation import  pnl_generation as pg
+from my_funcs import *
+
+import warnings
+
+def update_positions(trade_list,current_holdings):
+    for i, trade in trade_list.iterrows():
+        current_holdings.loc[trade["Contract"]]+=trade["Qty"]*trade["Side"]
+
+    return current_holdings
+
+def set_dataframe(df):
+    df.columns=df.loc[0]
+    df.drop(0,inplace=True)
+    df.set_index("Dates",inplace=True)
+
+def saving_dataframes(portfolio_values,name,output_folder):
+
+    portfolio_values.name=name
+    to_be_saved_as_csv=[portfolio_values]
+    excel_creation(to_be_saved_as_csv,output_folder,name)
+
+def create_trade_line(trades_list,account,strategy_a,date,price_list):
+    trade_table=pd.DataFrame(columns=["Account","Strategy","Date", "Price", "Side", "Contract", "Underlying","Contract_Type", "Qty", "Trading_Cost", "Strike_Price"])
+    trades_list=trades_list.groupby(trades_list.index).sum()
+    price_list=price_list.groupby(price_list.index).first()
+    for stock in trades_list.index:
+        Account=account
+        Strategy=strategy_a
+        Date=date
+        Price=price_list[stock]
+        Side=np.sign(trades_list[stock])
+        Contract=stock
+        Underlying=stock
+        Contract_Type="F"
+        Qty=abs(trades_list[stock])
+        Trading_Cost=0
+        Strike_Price=0
+        new_trade_line=[Account,Strategy,Date, Price, Side, Contract, Underlying,Contract_Type, Qty, Trading_Cost, Strike_Price]
+        trade_table.loc[len(trade_table)]=new_trade_line
+
+    return trade_table
+
+def check_for_exposure(current_positions,adjustment_positions,todays_position,previous_day_AUM):
+    todays_adjustment_positions=pd.Series()
+    current_adjustment_positions=adjustment_positions[adjustment_positions["Position"]!=0]
+
+    for stock in current_adjustment_positions.index:
+        if stock in todays_position.index:
+            if (np.sign(todays_position[stock]))==(np.sign(current_adjustment_positions.loc[stock,"Position"])):
+                adjustment_positions.loc[stock,"Position"]+=todays_position[stock]
+            elif abs(current_adjustment_positions.loc[stock,"Position"])>=abs(todays_position[stock]):
+                adjustment_positions.loc[stock,"Position"]+=todays_position[stock]
+            else:
+                todays_position[stock]+=current_adjustment_positions.loc[stock,"Position"]
+                todays_adjustment_positions[stock]=todays_position[stock]
+                adjustment_positions.loc[stock, "Position"]=0
+
+    current_positions["Position"]=current_positions["Position"].add(todays_position,fill_value=0)
+    current_positions["Exposure"]=current_positions["Close_price"]*current_positions["Position"]
+    current_positions["Exposure_in_perc"]=current_positions["Exposure"]/previous_day_AUM
+    current_positions["Gross_exposure_in_perc"]=current_positions["Exposure_in_perc"].abs()
+
+    return current_positions,adjustment_positions,todays_adjustment_positions
+
+
+
+def combined_portfolio_pnl_generation(universal_dates,expiry_days,baseamount,exposure_limit,strategy_details,price_data,
+                                      futures_2_data,individual_trade_list,output_folder):
+
+    previous_day_AUM=baseamount
+    monthly_index=pd.date_range(universal_dates[0],universal_dates[-1],freq="M")
+    expiry_days=pd.to_datetime(expiry_days)
+    stock_momentum_hedge_required=0
+    current_stock_momentum_hedge=0
+
+    account_list=individual_trade_list["Account"].unique()
+    strategy_list=individual_trade_list["Strategy"].unique()
+    symbols=individual_trade_list["Contract"].unique()
+    symbols=np.append(symbols,"Nz1 Index") if "Nz1 Index" not in symbols else symbols
+    underlying=individual_trade_list["Underlying"].unique()
+    symbols_1=pd.Series(symbols)
+
+    individual_trade_list.sort_values(by=["Date","Contract"],ignore_index=True,inplace=True)
+    individual_trade_list["Qty"]=individual_trade_list["Qty"].astype(float)
+    individual_trade_list["Side"]=individual_trade_list["Side"].astype(float)
+
+    symbols_data_list=pd.Series(price_data.keys())
+    todays_trade=pd.DataFrame(columns=individual_trade_list.columns)
+    strategy_exit_trades=pd.DataFrame(columns=individual_trade_list.columns)
+
+    #checking if any symbol data is missing
+    symbols_data_unavailable=symbols_1[~symbols_1.isin(symbols_data_list)]
+
+    if ~pd.isnull(symbols_data_unavailable).asll():
+        print(f"Following symbols data not fount \n"
+              f"{symbols_data_unavailable[symbols_data_unavailable.notnull()]}")
+        quit()
+    else:
+        print("========ALL DATA FOUND========")
+    check_status=0
+    strategy_data={}
+
+    strategy_data["RSI"]={}
+    strategy_data["RSI"]["Strategy"]="RSI"
+    strategy_data["RSI"]["Positions"]=pd.DataFrame(columns=
+                                                   ["Qty","Side","Entry_price","Todays_Price","Yesterdays_price","Todays_PNL","Trade_PNL"])
+    strategy_data["RSC"]["Trade_PNL"]=0
+    strategy_data["RSC"]["Todays_PNL"]=0
+
+    strategy_data["RSC"] = {}
+    strategy_data["RSC"]["Strategy"] = "RSI"
+    strategy_data["RSC"]["Positions"] = pd.DataFrame(columns=
+                                                     ["Qty", "Side", "Entry_price", "Todays_Price", "Yesterdays_price",
+                                                      "Todays_PNL", "Trade_PNL"])
+    strategy_data["ESA"]["Trade_PNL"] = 0
+    strategy_data["ESA"]["Todays_PNL"] = 0
+
+    strategy_data["ESA"] = {}
+    strategy_data["ESA"]["Strategy"] = "RSI"
+    strategy_data["ESA"]["Positions"] = pd.DataFrame(columns=
+                                                     ["Qty", "Side", "Entry_price", "Todays_Price", "Yesterdays_price",
+                                                      "Todays_PNL", "Trade_PNL"])
+    strategy_data["ESA"]["Trade_PNL"] = 0
+    strategy_data["ESA"]["Todays_PNL"] = 0
+
+    strategy_data["SN"] = {}
+    strategy_data["SN"]["Strategy"] = "RSI"
+    strategy_data["SN"]["Positions"] = pd.DataFrame(columns=
+                                                     ["Qty", "Side", "Entry_price", "Todays_Price", "Yesterdays_price",
+                                                      "Todays_PNL", "Trade_PNL"])
+    strategy_data["SN"]["Trade_PNL"] = 0
+    strategy_data["SN"]["Todays_PNL"] = 0
+
+    strategy_data["Weekly_MR"] = {}
+    strategy_data["Weekly_MR"]["Strategy"] = "RSI"
+    strategy_data["Weekly_MR"]["Positions"] = pd.DataFrame(columns=
+                                                     ["Qty", "Side", "Entry_price", "Todays_Price", "Yesterdays_price",
+                                                      "Todays_PNL", "Trade_PNL"])
+    strategy_data["Weekly_MR"]["Trade_PNL"] = 0
+    strategy_data["Weekly_MR"]["Todays_PNL"] = 0
+
+    strategy_data["DailyMR"] = {}
+    strategy_data["DailyMR"]["Strategy"] = "RSI"
+    strategy_data["DailyMR"]["Positions"] = pd.DataFrame(columns=
+                                                           ["Qty", "Side", "Entry_price", "Todays_Price",
+                                                            "Yesterdays_price",
+                                                            "Todays_PNL", "Trade_PNL"])
+    strategy_data["DailyMR"]["Trade_PNL"] = 0
+    strategy_data["DailyMR"]["Todays_PNL"] = 0
+
+    strategy_data["Stock_Momentum"] = {}
+    strategy_data["Stock_Momentum"]["Strategy"] = "RSI"
+    strategy_data["Stock_Momentum"]["Positions"] = pd.DataFrame(columns=
+                                                           ["Qty", "Side", "Entry_price", "Todays_Price",
+                                                            "Yesterdays_price",
+                                                            "Todays_PNL", "Trade_PNL"])
+    strategy_data["Stock_Momentum"]["Trade_PNL"] = 0
+    strategy_data["Stock_Momentum"]["Todays_PNL"] = 0
+
+    strategy_data["90D_Volatility"] = {}
+    strategy_data["90D_Volatility"]["Strategy"] = "RSI"
+    strategy_data["90D_Volatility"]["Positions"] = pd.DataFrame(columns=
+                                                                ["Qty", "Side", "Entry_price", "Todays_Price",
+                                                                 "Yesterdays_price",
+                                                                 "Todays_PNL", "Trade_PNL"])
+    strategy_data["90D_Volatility"]["Trade_PNL"] = 0
+    strategy_data["90D_Volatility"]["Todays_PNL"] = 0
+
+    strategy_data["M12-M1"] = {}
+    strategy_data["M12-M1"]["Strategy"] = "RSI"
+    strategy_data["M12-M1"]["Positions"] = pd.DataFrame(columns=
+                                                                ["Qty", "Side", "Entry_price", "Todays_Price",
+                                                                 "Yesterdays_price",
+                                                                 "Todays_PNL", "Trade_PNL"])
+    strategy_data["M12-M1"]["Trade_PNL"] = 0
+    strategy_data["M12-M1"]["Todays_PNL"] = 0
+
+    strategy_data["SML"] = {}
+    strategy_data["SML"]["Strategy"] = "RSI"
+    strategy_data["SML"]["Positions"] = pd.DataFrame(columns=
+                                                                ["Qty", "Side", "Entry_price", "Todays_Price",
+                                                                 "Yesterdays_price",
+                                                                 "Todays_PNL", "Trade_PNL"])
+    strategy_data["SML"]["Trade_PNL"] = 0
+    strategy_data["SML"]["Todays_PNL"] = 0
+
+    current_position_history=pd.DataFrame(columns=symbols,index=universal_dates)
+    current_position_exposure=pd.DataFrame(columns=symbols,index=universal_dates)
+    current_position_perc_history=pd.DataFrame(columns=symbols,index=universal_dates)
+    adjustments_position_history=pd.DataFrame(columns=symbols,index=universal_dates)
+    adjustments_position_history_perc=pd.DataFrame(columns=symbols,index=universal_dates)
+    price_data_close_series=pd.DataFrame(0,columns=symbols,index=universal_dates)
+    price_data_close_next_series=pd.DataFrame(0,columns=symbols,index=universal_dates)
+    daily_exposure=pd.DataFrame(columns=symbols,index=universal_dates)
+    weekly_exposure=pd.DataFrame(columns=symbols,index=universal_dates)
+    sn_exposure=pd.DataFrame(columns=symbols,index=universal_dates)
+    ESA_exposure = pd.DataFrame(columns=symbols, index=universal_dates)
+    stock_momentum_exposure = pd.DataFrame(columns=symbols, index=universal_dates)
+    rsi_exposure = pd.DataFrame(columns=symbols, index=universal_dates)
+    rsc_exposure = pd.DataFrame(columns=symbols, index=universal_dates)
+    d90_vol_exposure = pd.DataFrame(columns=symbols, index=universal_dates)
+    M12_M1_ret_exposure = pd.DataFrame(columns=symbols, index=universal_dates)
+    SML_ret_exposure=pd.DataFrame(columns=symbols,index=universal_dates)
+
+
+    portfolio_values=pd.DataFrame(columns=["PNL","net_exposure","gross_exposure","AUM","PNL_percentage"],
+                                  index=universal_dates)
+
+    month_end_AUM=pd.DataFrame(0,columns=[strategy_list,"Total"],index=monthly_index)
+
+    current_positions=pd.DataFrame(0,columns=["Position","Close_price","Exposure","Exposure_in_perc","Gross_exposure_in_perc"],
+    index=symbols)
+
+    adjustment_positions=pd.DataFrame(0,columns=["Position","Close_price","Percentage"],index=symbols)
+    strategy_position=pd.DataFrame(0,columns=strategy_details.index,index=symbols)
+    strategy_exposure=pd.DataFrame(0,columns=strategy_details.index,index=symbols)
+    strategy_exposure_in_perc=pd.DataFrame(0,columns=strategy_details.index,index=symbols)
+    strategy_pnl=pd.DataFrame(0,columns=strategy_details.index,index=symbols)
+    strategy_gross_exposure=pd.DataFrame(0,columns=strategy_details.index,index=symbols)
+    strategy_net_exposure=pd.DataFrame(0,columns=strategy_details.index,index=symbols)
+    strategy_net_PNL=pd.DataFrame(0,columns=strategy_details.index,index=symbols)
+    strategy_net_PNL_perc=pd.DataFrame(0,columns=strategy_details.index,index=symbols)
+
+    final_trade_register=pd.DataFrame(columns=individual_trade_list.columns)
+
+    for contract in symbols:
+        price_data_close_series=price_data[contract]["Close"]
+        price_data_close_next_series=futures_2_data[contract]["Close"]
+
+    price_data_close_series.ffill(inplace=True)
+    price_data_close_series.fillna(0,inplace=True)
+
+    price_data_close_next_series.ffill(inplace=True)
+    price_data_close_next_series.fillna(0,inplace=True)
+
+    month_end_closing_prices=price_data_close_series.resample("M").last()
+    expiry_days_next_series_closing_prices=price_data_close_next_series.loc[expiry_days]
+
+    month_end_qty=1000000/month_end_closing_prices
+
+    if Individual_Trades.trade_register!=[]:
+        Individual_Trades.trade_register[0].re_initialise()
+    start_of_month_Total_AUM=baseamount
+
+    previous_day=universal_dates[0]
+
+    print("PNL calculation started")
+
+    for current_month in monthly_index:
+        if current_month==monthly_index[0]:
+            current_month_momentum_qty=(0.035*strategy_details.loc["Stock_momentum","Weightage"]*start_of_month_Total_AUM/1000000)*(month_end_qty.loc[current_month])
+        else:
+            current_month_momentum_qty = (0.035 * strategy_details.loc[
+                "Stock_momentum", "Weightage"] * start_of_month_Total_AUM / 1000000) *(month_end_qty.shift().loc[current_month])
+
+        current_month_dates=universal_dates[(universal_dates.month==current_month.month)&(universal_dates.year==current_month.year)]
+        current_month_trades=individual_trade_list[individual_trade_list["Date"].map(
+            lambda x: (x in current_month_dates) )]
+
+        last_day_of_month=current_month_dates[-1]
+        expiry_day_for_month=[expiry for expiry in expiry_days if expiry in current_month_trades][0]
+
+        print(f"\n Processing: {current_month.month}--{current_month.year}")
+
+        for current_day in current_month_dates:
+            todays_trade.drop(todays_trade.index,inplace=True)
+
+            if current_day==datetime.datetime(2012,1,1):
+                print(f"\n processing : {current_day}")
+
+
+            ### Update PNL for yesterdays positions
+
+            todays_close_price=price_data_close_series[current_day]
+            todays_nifty_price=todays_close_price["Nz1 Index"]
+            if previous_day!=expiry_day_for_month:
+                yesterdays_close_price=price_data_close_series.shift().loc[current_day]
+            else:
+                yesterdays_close_price = price_data_close_next_series.shift().loc[current_day]
+
+            current_positions["Close_price"]=todays_close_price
+            current_positions["Previous_Close_price"]=yesterdays_close_price
+            current_positions["Todays_position_PNL"]=current_positions["Position"]*\
+                                                     (current_positions["Close_price"]-current_positions["Previous_Close_price"])
+
+            portfolio_values.loc[current_day,"PNL"]=current_positions["Todays_position_PNL"].sum()
+            portfolio_values.loc[current_day,"PNL_percentage"]=portfolio_values.loc[current_day,"PNL"]/previous_day_AUM
+            portfolio_values.loc[current_day,"AUM"]=previous_day_AUM+portfolio_values.loc[current_day,"PNL"]
+
+            if current_day==current_month_dates[0]:
+                strategy_details["Current_AUM"]=start_of_month_Total_AUM*strategy_details["Weightage"]
+
+            for strategy in strategy_list:
+                strategy_exposure[strategy]=strategy_position[strategy]*todays_close_price
+                strategy_pnl[strategy]=strategy_position[strategy]*(todays_close_price-yesterdays_close_price)
+                strategy_net_PNL.loc[current_day,strategy]=strategy_pnl[strategy].sum()
+                strategy_net_PNL_perc.loc[current_day, strategy] = strategy_pnl[strategy].sum() / \
+                                                                   (strategy_details.loc[strategy,"Current_AUM"])
+
+                if not strategy_data[strategy]["Positions"].empty:
+                    strategy_data[strategy]["Positions"]["Todays_price"]=todays_close_price
+                    strategy_data[strategy]["Positions"]["Yesterdays_price"]=yesterdays_close_price
+                    strategy_data[strategy]["Positions"]["Todays_PNL"]=((strategy_data[strategy]["Positions"]["Todays_price"])/
+                                                                        (strategy_data[strategy]["Positions"]["Yesterdays_price"])-1) \
+                                                                       * (strategy_data[strategy]["Positions"]["Side"])
+                    strategy_data[strategy]["Positions"]["Trade_PNL"]=((strategy_data[strategy]["Positions"]["Todays_price"])/
+                                                                        (strategy_data[strategy]["Positions"]["Entry_price"])-1) \
+                                                                       * (strategy_data[strategy]["Positions"]["Side"])
+                    strategy_data[strategy]["Trade_PNL"]=strategy_data[strategy]["Positions"]["Trade_PNL"].mean()
+                    strategy_data[strategy]["Trade_PNL"]=strategy_data[strategy]["Positions"]["Todays_PNL"].mean()
+
+            ### update PNL for yesterdays positions block closed
+
+            for strategy in strategy_list:
+                todays_strategy_trades=current_month_trades[(current_month_trades["Date"]==current_day) &(current_month_trades["Strategy"]==strategy)]
+                todays_strategy_trades.reset_index(inplace=True,drop=True)
+                strategy_exit_trades.drop(strategy_exit_trades.index,inplace=True)
+
+                if strategy=="Stock_Momentum":
+                    todays_strategy_trades["Qty"]=todays_strategy_trades["Qty"]*(todays_strategy_trades["Contract"].map(current_month_momentum_qty))
+                    todays_trade=todays_trade.append(pd.concat([todays_strategy_trades]))
+                    todays_trade.reset_index(inplace=True, drop=True)
+                    strategy_position[strategy]=update_positions(todays_strategy_trades,strategy_position[strategy])
+
+                else:
+                    strategy_per_trade_value=strategy_details.loc[strategy,"Current_AUM"]/(strategy_details.loc[strategy,"Stocks"])
+                    todays_strategy_trades["Qty"]=strategy_per_trade_value/todays_strategy_trades["Price"]
+
+                    if todays_strategy_trades.empty:
+                        ##check strategy PNL for stop loss block starts here
+                        if strategy in ["RSI","RSC","SN","ESA","90D_volatility","SML","M12-M1"]:
+                            if (strategy_data[strategy]["Trade_PNL"]<(strategy_details.loc[strategy,"Stop_Loss"]*0.5)):
+                                strategy_data[strategy]["Positions"].drop(strategy_data[strategy]["Positions"].index,inplace=True)
+
+                                strategy_data[strategy]["Trade_PNL"]=0
+                                strategy_data[strategy]["Todays_PNL"]=0
+
+                                current_strategy_positions=strategy_position[strategy]
+                                current_strategy_positions=current_strategy_positions[current_strategy_positions!=0]
+                                strategy_exit_trades=create_trade_line(current_strategy_positions*-1,"",strategy,current_day,todays_close_price)
+                                strategy_position[strategy]=update_positions(strategy_exit_trades,strategy_position[strategy])
+
+                        ##check strategy PNL for stop loss block ends here
+                    else:
+                        if not strategy_data[strategy]["Positions"].empty:
+                            current_strategy_positions=strategy_position[strategy]
+                            current_strategy_positions=current_strategy_positions[current_strategy_positions!=0]
+                            strategy_exit_trades=create_trade_line(current_strategy_positions*-1,"",strategy,current_day,todays_close_price)
+                            strategy_position[strategy]=update_positions(strategy_exit_trades,strategy_position[strategy])
+
+                        temp_todays_strategy_trade=todays_strategy_trades.copy()
+                        temp_todays_strategy_trade.set_index(temp_todays_strategy_trade["Contract"],inplace=True,drop=True)
+                        strategy_data[strategy]["Positions"].drop(strategy_data[strategy]["Positions"].index,inplace=True)
+                        strategy_data[strategy]["Positions"].reindex(temp_todays_strategy_trade["Contract"])
+                        strategy_data[strategy]["Positions"]["Qty"]=temp_todays_strategy_trade["Qty"]
+                        strategy_data[strategy]["Positions"]["Side"]=temp_todays_strategy_trade["Side"]
+                        strategy_data[strategy]["Positions"]["Entry_price"]=temp_todays_strategy_trade["Price"]
+
+                    todays_trade=todays_trade.append(pd.concat([todays_strategy_trades,strategy_exit_trades]))
+                    todays_trade.reset_index(inplace=True,drop=True)
+                    strategy_position[strategy]=update_positions(todays_strategy_trades,strategy_position[strategy])
+
+
+                strategy_exposure[strategy]=strategy_position[strategy]*todays_close_price
+                strategy_exposure_in_perc[strategy]=strategy_exposure[strategy]/(strategy_details.loc[strategy,"Current_AUM"])
+                strategy_net_exposure.loc[current_day,strategy]=(strategy_exposure[strategy].sum())/(strategy_details.loc[strategy,"Current_AUM"])
+                strategy_gross_exposure.loc[current_day, strategy] = (strategy_exposure[strategy].abs().sum()) / (
+                strategy_details.loc[strategy, "Current_AUM"])
+
+            if current_day==last_day_of_month:
+                previou_month_aum=start_of_month_Total_AUM
+                start_of_month_Total_AUM=portfolio_values.loc[current_day,"PNL"]+previous_day_AUM
+
+
+
+
