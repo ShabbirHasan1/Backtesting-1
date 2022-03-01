@@ -498,7 +498,127 @@ def combined_portfolio_pnl_generation(universal_dates,expiry_days,baseamount,exp
             adjustment_positions.loc["Close_price"]=todays_close_price
             adjustment_positions.loc["Percentage"]=(adjustment_positions["Positions"]*adjustment_positions.loc["Close_price"])/previous_day_AUM
 
-            #update PNL for the day.current positions
+            #update PNL for the day,current positions
+            current_position_history.loc[current_day]=current_positions["Position"]
+            current_position_exposure.loc[current_day]=current_positions["Exposure"]
+            current_position_perc_history.loc[current_day]=current_positions["Exposure_in_perc"]
+            adjustments_position_history.loc[current_day]=adjustment_positions["Position"]
+            adjustments_position_history_perc.loc[current_day]=adjustment_positions["Percentage"]
+            
+            portfolio_values.loc[current_day,"net_exposure"]=current_positions["Exposure_in_perc"].sum()
+            portfolio_values.loc[current_day,"gross_exposure"]=current_positions["Gross_exposure_in_perc"].sum()
+            previous_day_AUM=portfolio_values.loc[current_day,"AUM"]
+            
+            #add the trades in final trade register
+            previous_day=current_day
+            final_trade_register=final_trade_register.append(todays_trade)
+    
+    daily_exposure=daily_exposure.T
+    weekly_exposure=weekly_exposure.T
+    sn_exposure=sn_exposure.T
+    rsi_exposure=rsi_exposure.T
+    rsc_exposure=rsc_exposure.T
+    ESA_exposure=ESA_exposure.T
+    stock_momentum_exposure=stock_momentum_exposure.T
+    d90_vol_exposure=d90_vol_exposure.T
+    M12_M1_ret_exposure=M12_M1_ret_exposure.T
+    SML_ret_exposure=SML_ret_exposure.T
+    
+    to_be_saved_as_csv=[daily_exposure,weekly_exposure,sn_exposure,rsi_exposure,rsc_exposure,ESA_exposure,stock_momentum_exposure,d90_vol_exposure,M12_M1_ret_exposure,SML_ret_exposure]
+    excel_creation(to_be_saved_as_csv,output_folder,"Combined portfolio exposure")
+    
+    return current_position_history,current_position_exposure,price_data_close_series,current_position_perc_history,adjustments_position_history,adjustments_position_history_perc\
+        ,strategy_net_PNL,strategy_net_PNL_perc,strategy_net_exposure,strategy_gross_exposure,portfolio_values,final_trade_register
+
+if __name__=='__main__':
+    
+    warnings.filterwarnings('ignore')
+    
+    baseamount=1000000000
+    previous_day_AUM=baseamount
+    exposure_limit=0.1
+    stock_momentum_hedge_required=0
+    current_stock_momentum_hedge=0
+
+    portfolio_start_date = datetime.datetime(2010,12,1)
+    portfolio_end_date = datetime.datetime(2022, 2, 28)
+    portfolio_type="Mean Reversion"
+
+    current_folder_path=Path().absolute().joinpath("Data")
+
+    input_folder_path=Path().absolute().joinpath("Input_files")
+    expiry_days_path=current_folder_path/"Expiry days.csv"
+    universe_stocks_path=current_folder_path/"Nifty Index members.csv"
+    nifty_price_data_path=current_folder_path/"Price_Data/Nifty Index.csv"
+    nifty_futures_data_path=current_folder_path/"Price_Data/Nz1 Index.csv"
+    nifty_futures2_data_path=current_folder_path/"Price_Data/Nz2 Index.csv"
+    cash_data_folder_path=current_folder_path/"Stock Prices CSV"
+
+    futures_1_data_folder_path=current_folder_path/"Futures Prices CSV"
+    futures_2_data_folder_path=current_folder_path/"Futures Prices series2 CSV"
+    trade_file_path=current_folder_path/"Portfolio_construction/trades_input.csv"
+
+    output_folder="Portfolio_PNL/Iterations1"
+
+    nifty_data=reading_price_data_from_csv(nifty_price_data_path)
+    nifty_data= nifty_data[(nifty_data.index>portfolio_start_date) &(nifty_data.index<=portfolio_end_date) ]
+    universal_dates=nifty_data.index
+
+    monthly_index=pd.date_range(universal_dates[0],universal_dates[-1],freq="M")
+    annual_index=pd.date_range(universal_dates[0],universal_dates[-1],freq="Y")
+
+    price_data=import_all_price_data_from_csv_files(cash_data_folder_path)
+    symbol_data=pd.Series(price_data.keys())
+
+    futures_data=import_all_price_data_from_csv_files(futures_1_data_folder_path)
+    futures_symbol_data=pd.Series(futures_data.keys())
+
+    futures_2_data=import_all_price_data_from_csv_files(futures_2_data_folder_path)
+    futures_2_symbol_data=pd.Series(futures_2_data.keys())
+
+    expiry_days=pd.read_csv(expiry_days_path)
+    expiry_days=pd.to_datetime(expiry_days["Expiry days"])
+    expiry_days=expiry_days[expiry_days.between(portfolio_start_date,portfolio_end_date)]
+    pnl_expiry_series=pd.DataFrame(0,columns=["Baseamount","Cumulative PNL","PNL in INR","PNL in %"],index=expiry_days)
+
+    individual_trade_list=reading_trades_from_csv(trade_file_path)
+    individual_trade_list.columns=["Account","Strategy","Date", "Price", "Side", "Contract", "Underlying","Contract_Type", "Qty", "Trading_Cost", "Strike_Price"]
+
+    strategy_details=pd.DataFrame(columns=["Weightage","Stocks","Current_AUM","Stop_Loss"])
+    strategy_details.loc["Weekly_MR"]=[0.05,10,0,-1]
+    strategy_details.loc["RSI"]=[0.15,10,0,-0.05]
+    strategy_details.loc["RSC"] = [0.10, 10, 0, -0.05]
+    strategy_details.loc["SN"]=[0.10,10,0,-0.05]
+    strategy_details.loc["ESA"]=[0,10,0,-0.05]
+    strategy_details.loc["Stock_Momentum"]=[0.20,1,0,-1]
+    strategy_details.loc["DailyMR"]=[0.1,10,0,-1]
+    strategy_details.loc["90D_Volatility"]=[0.15,10,0,-0.05]
+    strategy_details.loc["M12-M1"]=[0.15,10,0,-0.05]
+    strategy_details.loc["SML"]=[0.05,10,0,-0.05]
+
+    strategy_details["Current_AUM"]=baseamount*strategy_details["Weightage"]
+
+    current_positions_history, current_position_exposure, price_data_close_series, current_position_perc_history, adjustments_position_history, adjustments_position_history_perc \
+        , strategy_net_PNL, strategy_net_PNL_perc, strategy_net_exposure, strategy_gross_exposure, portfolio_values, final_trade_register=combined_portfolio_pnl_generation(universal_dates,expiry_days,baseamount,exposure_limit,strategy_details,price_data,
+                                      futures_2_data,individual_trade_list,output_folder)
+
+    saving_dataframes(current_positions_history,"Positions",output_folder)
+    saving_dataframes(price_data_close_series,"Closing_prices",output_folder)
+    saving_dataframes(current_position_exposure,"Exposure_stock",output_folder)
+    saving_dataframes(current_position_perc_history,"Exposure_stock_perc",output_folder)
+    saving_dataframes(adjustments_position_history,"Adjustment Positions",output_folder)
+    saving_dataframes(adjustments_position_history_perc,"Adjustment_perc",output_folder)
+    saving_dataframes(strategy_net_PNL,"Strategy Daily PNL",output_folder)
+    saving_dataframes(strategy_net_PNL_perc,"Strategy Daily PNL in %",output_folder)
+    saving_dataframes(strategy_net_exposure,"Strategy Net Exposure",output_folder)
+    saving_dataframes(strategy_gross_exposure,"Strategy Gross Exposure",output_folder)
+    saving_dataframes(portfolio_values,"PNL_series",output_folder)
+
+    final_trade_register["NetQty"]=final_trade_register["Qty"]*final_trade_register["Side"]
+    final_trade_register=final_trade_register.groupby(["Date","Contract"])["NetQty"].sum()
+    saving_dataframes(final_trade_register,"Trades",output_folder)
+
+
 
 
 
