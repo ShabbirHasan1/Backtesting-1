@@ -6,6 +6,46 @@ from Individual_Trades import Individual_Trades
 from my_funcs import *
 import warnings
 
+def set_dataframe(df):
+    df.columns=df.loc[0]
+    df.drop(0,inplace=True)
+    df.set_index("Dates",inplace=True)
+
+def saving_dataframes(df,name,output_folder):
+    df.name=name
+    to_be_saved_as_csv=[df]
+    excel_creation(to_be_saved_as_csv,output_folder,name)
+
+def update_positions(trade_list,current_holdings):
+    for i,trade in trade_list.iterrows():
+        current_holdings.loc[trade["Contract"]]+=trade["Qty"]+trade["Side"]
+
+    return current_holdings
+
+
+def create_trade_lines(trades_list,account,strategy_a,date,price_list):
+    trade_table=pd.DataFrame(columns=["Account","Strategy","Date","Price","Side","Contract","Underlying","Contract_Type"
+                                      ,"Qty","Trading_Cost","Strike_Price"])
+    trades_list=trades_list.groupby(trades_list.index).sum()
+    price_list=price_list.groupby(price_list.index).first()
+
+    for stock in trades_list.index:
+        Account=account
+        Strategy=strategy_a
+        Date=date
+        Price=price_list[stock]
+        Side=np.sign(trades_list[stock])
+        Contract=stock
+        Underlying=stock
+        Contract_Type="F"
+        Qty=abs(trades_list[stock])
+        Trading_Cost=0
+        Strike_Price=0
+        new_trade_line=[Account,Strategy,Date,Price,Side,Contract,Underlying,Contract_Type,Qty,Trading_Cost,Strike_Price]
+        trade_table.loc[len(trade_table)]=new_trade_line
+
+    return trade_table
+
 def combined_portfolio_pnl_generation(universal_dates,expiry_days,baseamount,exposure_limit,strategy_details,price_data,
                                       futures_2_data,individual_trade_list,output_folder):
     previous_day_AUM=baseamount
@@ -247,7 +287,7 @@ def combined_portfolio_pnl_generation(universal_dates,expiry_days,baseamount,exp
 
             for strategy in strategy_list:
 
-                todays_strategy_trades=current_month_trades[(current_month_trades["Date"]==current_day) &(current_month_trades["Strategy"]==Strategy)]
+                todays_strategy_trades=current_month_trades[(current_month_trades["Date"]==current_day) &(current_month_trades["Strategy"]==strategy)]
                 todays_strategy_trades.reset_index(inplace=True,drop=True)
                 strategy_exit_trades.drop(strategy_exit_trades.index,inplace=True)
 
@@ -262,6 +302,48 @@ def combined_portfolio_pnl_generation(universal_dates,expiry_days,baseamount,exp
                     strategy_per_trade_value=strategy_details.loc[strategy,"Current_AUM"]/(strategy_details.loc[strategy,"Stocks"])
                     todays_strategy_trades["Qty"]=strategy_per_trade_value/todays_strategy_trades["Price"]
 
-                    if to
+                    if todays_strategy_trades.empty:
+
+                        ## check strategy PNL for Stop Loss block starts
+                        if strategy in ["RSI","RSC","SN","ESA","90D_Volatility","SML","M12-M1"]:
+                            if (strategy_data[strategy]["Trade_PNL"]<(strategy_details.loc[strategy,"Stop_loss"]*0.5)):
+                                strategy_data[strategy]["Positions"].drop(strategy_data[strategy]["Positions"].index,inplace=True)
+                                strategy_data[strategy]["Trade_PNL"]=0
+                                strategy_data[strategy]["Todays_PNL"] = 0
+                                current_strategy_positions=strategy_position[strategy]
+                                current_strategy_positions =current_strategy_positions[current_strategy_positions!=0]
+
+                                strategy_exit_trades=create_trade_lines(current_strategy_positions*-1,"",strategy,current_day,todays_close_price)
+                                strategy_position[strategy]=update_positions(strategy_exit_trades,strategy_position[strategy])
+                        ## check strategy PNL for Stop Loss block ends
+
+                    else:
+                        if not strategy_data[strategy]["Positions"].empty:
+                            current_strategy_positions=strategy_position[strategy]
+                            current_strategy_positions = current_strategy_positions[current_strategy_positions != 0]
+                            strategy_exit_trades = create_trade_lines(current_strategy_positions * -1, "", strategy,
+                                                                      current_day, todays_close_price)
+                            strategy_position[strategy] = update_positions(strategy_exit_trades,
+                                                                           strategy_position[strategy])
+
+                        temp_todays_strategy_trade=todays_strategy_trades.copy()
+                        temp_todays_strategy_trade.set_index(temp_todays_strategy_trade["Contract"],drop=True,inplace=True)
+
+                        strategy_data[strategy]["Positions"].drop(strategy_data[strategy]["Positions"].index,inplace=True)
+                        strategy_data[strategy]["Positions"].reindex(temp_todays_strategy_trade["Contract"])
+                        strategy_data[strategy]["Positions"]["Qty"]=temp_todays_strategy_trade["Qty"]
+                        strategy_data[strategy]["Positions"]["Side"]=temp_todays_strategy_trade["Side"]
+                        strategy_data[strategy]["Positions"]["Entry_price"]=temp_todays_strategy_trade["Price"]
+
+                    todays_trade=todays_trade.append(pd.concat(todays_strategy_trades,strategy_exit_trades))
+                    todays_trade.reset_index(inplace=True,drop=True)
+                    strategy_position[strategy]=update_positions(strategy_exit_trades,
+                                                                           strategy_position[strategy])
+
+
+                strategy_exposure[strategy]=strategy_position[strategy]*todays_close_price
+                strategy_exposure_in_perc[strategy]=strategy_exposure[strategy]/(start_of_month_Total_AUM*strategy_details.loc[strategy,"Weightage"])
+                strategy_net_exposure.loc[current_day,strategy]=(strategy_exposure[strategy].abs().sum())/(start_of_month_Total_AUM*strategy_details.loc[strategy,"Weightage"])
+
 
 
